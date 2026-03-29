@@ -1,19 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, CreditCard, Smartphone } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { useTranslation } from '../hooks/useTranslation';
 import { useCartStore } from '../store/useCartStore';
 import { useAppStore } from '../store/useAppStore';
-import { useCreateOrder, useCreatePayment } from '../lib/supabase/hooks';
+import { supabase } from '../lib/supabase';
 import { formatPrice } from '../lib/utils';
 import { hapticNotification, getTelegramUser } from '../lib/telegram';
-import { toast } from '../components/Toast';
 
 const cities = [
-  'Ташкент', 'Самарканд', 'Бухара', 'Андижан', 'Наманган',
-  'Фергана', 'Коканд', 'Нукус', 'Термез', 'Карши',
-  'Хива', 'Гулистан', 'Джизак', 'Навои', 'Ургенч',
+  'Ташкент',
+  'Самарканд',
+  'Бухара',
+  'Андижан',
+  'Наманган',
+  'Фергана',
+  'Коканд',
+  'Нукус',
+  'Термез',
+  'Карши',
 ];
 
 export const Checkout = () => {
@@ -22,16 +28,13 @@ export const Checkout = () => {
   const { items, getTotalPrice, clearCart } = useCartStore();
   const telegramUserId = useAppStore((state) => state.telegramUserId);
 
-  const createOrderMutation = useCreateOrder();
-  const createPaymentMutation = useCreatePayment();
-
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
     city: cities[0],
     address: '',
     deliveryType: 'standard',
-    paymentMethod: 'payme' as 'payme' | 'click' | 'uzum' | 'cash',
+    paymentMethod: 'cash',
     notes: '',
   });
 
@@ -50,62 +53,47 @@ export const Checkout = () => {
       const user = getTelegramUser();
       const userId = user?.id || telegramUserId || 0;
 
-      // Create order
-      const order = await createOrderMutation.mutateAsync({
-        telegram_user_id: userId,
-        items: items.map((item) => ({
-          productId: item.productId,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          size: item.size,
-          color: item.color,
-          image: item.image,
-        })),
-        total_amount: totalAmount,
-        status: formData.paymentMethod === 'cash' ? 'new' : 'processing',
-        customer_info: {
-          name: formData.fullName,
-          phone: formData.phone,
-          city: formData.city,
-          address: formData.address,
-        },
-        delivery_type: formData.deliveryType,
-        delivery_cost: deliveryCost,
-        payment_method: formData.paymentMethod,
-        notes: formData.notes,
-      });
+      const { data, error } = await supabase
+        .from('orders')
+        .insert({
+          telegram_user_id: userId,
+          items: items.map((item) => ({
+            productId: item.productId,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            size: item.size,
+            color: item.color,
+            image: item.image,
+          })),
+          total_amount: totalAmount,
+          status: 'new',
+          customer_info: {
+            name: formData.fullName,
+            phone: formData.phone,
+            city: formData.city,
+            address: formData.address,
+          },
+          delivery_type: formData.deliveryType,
+          delivery_cost: deliveryCost,
+          payment_method: formData.paymentMethod,
+          notes: formData.notes,
+        })
+        .select()
+        .single();
 
-      setOrderId(order.id);
+      if (error) throw error;
 
-      // Handle payment
-      if (formData.paymentMethod !== 'cash') {
-        try {
-          const paymentData = await createPaymentMutation.mutateAsync({
-            orderId: order.id,
-            amount: totalAmount,
-            paymentMethod: formData.paymentMethod,
-          });
-
-          if (paymentData.paymentUrl) {
-            // Redirect to payment page
-            window.location.href = paymentData.paymentUrl;
-            return;
-          }
-        } catch (paymentError) {
-          console.error('Payment creation error:', paymentError);
-          toast.error(language === 'ru' ? 'Ошибка создания платежа' : 'To\'lov yaratishda xatolik');
-        }
+      if (data) {
+        setOrderId(data.id);
+        setOrderPlaced(true);
+        clearCart();
+        hapticNotification('success');
       }
-
-      setOrderPlaced(true);
-      clearCart();
-      hapticNotification('success');
-      toast.success(t('order_success'));
     } catch (error) {
       console.error('Error placing order:', error);
       hapticNotification('error');
-      toast.error(t('error'));
+      alert(t('error'));
     } finally {
       setLoading(false);
     }
@@ -128,11 +116,9 @@ export const Checkout = () => {
             {t('order_number')}: <span className="font-mono">{orderId.slice(0, 8)}</span>
           </p>
           <p className="text-gray-600 dark:text-gray-400 mb-8">
-            {language === 'ru'
-              ? 'Мы свяжемся с вами в ближайшее время'
-              : 'Tez orada siz bilan bog\'lanamiz'}
+            Мы свяжемся с вами в ближайшее время
           </p>
-          <div className="space-y-3 max-w-md mx-auto">
+          <div className="space-y-3">
             <button
               onClick={() => navigate('/orders')}
               className="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors"
@@ -153,13 +139,13 @@ export const Checkout = () => {
 
   return (
     <Layout showBottomNav={false}>
-      <div className="container mx-auto px-4 py-4 pb-32">
+      <div className="container mx-auto px-4 py-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
           {t('checkout')}
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+          <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               {t('customer_info')}
             </h2>
@@ -174,7 +160,7 @@ export const Checkout = () => {
                   required
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 />
               </div>
 
@@ -188,7 +174,7 @@ export const Checkout = () => {
                   placeholder="+998 90 123 45 67"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 />
               </div>
 
@@ -199,7 +185,7 @@ export const Checkout = () => {
                 <select
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 >
                   {cities.map((city) => (
                     <option key={city} value={city}>
@@ -218,25 +204,25 @@ export const Checkout = () => {
                   rows={3}
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 />
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+          <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               {t('delivery')}
             </h2>
 
             <div className="space-y-2">
-              <label className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+              <label className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">
                     {t('delivery_standard')}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {formatPrice(20000)} • 3-5 {language === 'ru' ? 'дней' : 'kun'}
+                    {formatPrice(20000)}
                   </p>
                 </div>
                 <input
@@ -245,17 +231,17 @@ export const Checkout = () => {
                   value="standard"
                   checked={formData.deliveryType === 'standard'}
                   onChange={(e) => setFormData({ ...formData, deliveryType: e.target.value })}
-                  className="w-5 h-5 text-blue-500"
+                  className="w-5 h-5"
                 />
               </label>
 
-              <label className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+              <label className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">
                     {t('delivery_express')}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {formatPrice(50000)} • 1-2 {language === 'ru' ? 'дня' : 'kun'}
+                    {formatPrice(50000)}
                   </p>
                 </div>
                 <input
@@ -264,44 +250,33 @@ export const Checkout = () => {
                   value="express"
                   checked={formData.deliveryType === 'express'}
                   onChange={(e) => setFormData({ ...formData, deliveryType: e.target.value })}
-                  className="w-5 h-5 text-blue-500"
+                  className="w-5 h-5"
                 />
               </label>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
+          <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               {t('payment_method')}
             </h2>
 
             <div className="space-y-2">
-              {[
-                { id: 'payme', icon: CreditCard, label: 'Payme', color: 'text-blue-600' },
-                { id: 'click', icon: CreditCard, label: 'Click', color: 'text-green-600' },
-                { id: 'uzum', icon: Smartphone, label: 'Uzum Bank', color: 'text-purple-600' },
-                { id: 'cash', icon: CreditCard, label: t('payment_cash'), color: 'text-gray-600' },
-              ].map(({ id, icon: Icon, label, color }) => (
+              {['cash', 'card', 'payme', 'click'].map((method) => (
                 <label
-                  key={id}
-                  className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                  key={method}
+                  className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
-                  <div className="flex items-center space-x-3">
-                    <Icon className={`w-6 h-6 ${color}`} />
-                    <span className="font-medium text-gray-900 dark:text-white">{label}</span>
-                  </div>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {t(`payment_${method}` as any)}
+                  </span>
                   <input
                     type="radio"
                     name="payment"
-                    value={id}
-                    checked={formData.paymentMethod === id}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        paymentMethod: e.target.value as any,
-                      })
-                    }
-                    className="w-5 h-5 text-blue-500"
+                    value={method}
+                    checked={formData.paymentMethod === method}
+                    onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                    className="w-5 h-5"
                   />
                 </label>
               ))}
@@ -310,14 +285,14 @@ export const Checkout = () => {
 
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
             <div className="space-y-2">
-              <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                <span>{language === 'ru' ? 'Товары' : 'Mahsulotlar'}:</span>
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Товары:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
                   {formatPrice(getTotalPrice())}
                 </span>
               </div>
-              <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                <span>{language === 'ru' ? 'Доставка' : 'Yetkazib berish'}:</span>
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Доставка:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
                   {formatPrice(deliveryCost)}
                 </span>
@@ -332,30 +307,15 @@ export const Checkout = () => {
               </div>
             </div>
           </div>
-        </form>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 shadow-lg">
           <button
-            onClick={handleSubmit}
+            type="submit"
             disabled={loading}
-            className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition-colors disabled:bg-gray-400 flex items-center justify-center space-x-2"
+            className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition-colors disabled:bg-gray-400"
           >
-            {loading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>{t('loading')}</span>
-              </>
-            ) : (
-              <span>
-                {formData.paymentMethod === 'cash'
-                  ? t('place_order')
-                  : language === 'ru'
-                  ? 'Перейти к оплате'
-                  : 'To\'lovga o\'tish'}
-              </span>
-            )}
+            {loading ? t('loading') : t('place_order')}
           </button>
-        </div>
+        </form>
       </div>
     </Layout>
   );
