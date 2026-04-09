@@ -74,8 +74,8 @@ export const Profile = () => {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-4 space-y-4 pb-24">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-5 pt-6 pb-10 relative">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-5 pt-6 pb-12 rounded-t-2xl">
             <div className="flex items-start justify-between">
               <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
                 <User className="w-8 h-8 text-white" />
@@ -97,7 +97,7 @@ export const Profile = () => {
             </div>
           </div>
 
-          <div className="-mt-6 mx-4 bg-white dark:bg-gray-700 rounded-2xl shadow-md px-4 py-3 grid grid-cols-3 text-center divide-x divide-gray-100 dark:divide-gray-600">
+          <div className="-mt-6 mx-4 bg-white dark:bg-gray-700 rounded-2xl shadow-md px-4 py-3 grid grid-cols-3 text-center divide-x divide-gray-100 dark:divide-gray-600 relative z-10">
             <div>
               <p className="text-lg font-bold text-gray-900 dark:text-white">{orders.length}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">{language === 'ru' ? 'Заказов' : 'Buyurtma'}</p>
