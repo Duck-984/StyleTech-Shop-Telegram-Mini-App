@@ -13,6 +13,7 @@ import { AdminProducts } from './pages/admin/AdminProducts';
 import { AdminOrders } from './pages/admin/AdminOrders';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminBanners } from './pages/admin/AdminBanners';
+import { AdminDelivery } from './pages/admin/AdminDelivery';
 import { AdminRoute } from './components/AdminRoute';
 import { ToastContainer } from './components/Toast';
 
@@ -80,6 +81,14 @@ function App() {
             element={
               <AdminRoute requiredRole="manager">
                 <AdminBanners />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/delivery"
+            element={
+              <AdminRoute requiredRole="manager">
+                <AdminDelivery />
               </AdminRoute>
             }
           />

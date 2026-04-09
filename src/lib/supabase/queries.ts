@@ -347,6 +347,72 @@ export type Banner = {
   updated_at: string;
 };
 
+export type DeliveryZone = {
+  id: string;
+  city_ru: string;
+  city_uz: string;
+  region_ru: string;
+  region_uz: string;
+  standard_price: number;
+  express_price: number;
+  standard_days_min: number;
+  standard_days_max: number;
+  express_days_min: number;
+  express_days_max: number;
+  free_threshold: number | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export const deliveryZoneQueries = {
+  getActive: async (): Promise<DeliveryZone[]> => {
+    const { data, error } = await supabase
+      .from('delivery_zones')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as DeliveryZone[];
+  },
+
+  getAll: async (): Promise<DeliveryZone[]> => {
+    const { data, error } = await supabase
+      .from('delivery_zones')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as DeliveryZone[];
+  },
+
+  create: async (zone: Omit<DeliveryZone, 'id' | 'created_at' | 'updated_at'>): Promise<DeliveryZone> => {
+    const { data, error } = await supabase
+      .from('delivery_zones')
+      .insert(zone)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as DeliveryZone;
+  },
+
+  update: async (id: string, zone: Partial<Omit<DeliveryZone, 'id' | 'created_at' | 'updated_at'>>): Promise<DeliveryZone> => {
+    const { data, error } = await supabase
+      .from('delivery_zones')
+      .update({ ...zone, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as DeliveryZone;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('delivery_zones').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
 export const bannerQueries = {
   getActive: async (): Promise<Banner[]> => {
     const { data, error } = await supabase

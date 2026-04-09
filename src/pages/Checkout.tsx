@@ -1,20 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, CreditCard, Smartphone } from 'lucide-react';
+import { CheckCircle, CreditCard, Smartphone, Truck, Zap, Tag } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { useTranslation } from '../hooks/useTranslation';
 import { useCartStore } from '../store/useCartStore';
 import { useAppStore } from '../store/useAppStore';
-import { useCreateOrder, useCreatePayment } from '../lib/supabase/hooks';
+import { useCreateOrder, useCreatePayment, useDeliveryZones } from '../lib/supabase/hooks';
 import { formatPrice } from '../lib/utils';
 import { hapticNotification, getTelegramUser } from '../lib/telegram';
 import { toast } from '../components/Toast';
-
-const cities = [
-  'Ташкент', 'Самарканд', 'Бухара', 'Андижан', 'Наманган',
-  'Фергана', 'Коканд', 'Нукус', 'Термез', 'Карши',
-  'Хива', 'Гулистан', 'Джизак', 'Навои', 'Ургенч',
-];
+import type { DeliveryZone } from '../lib/supabase/queries';
 
 export const Checkout = () => {
   const { t, language } = useTranslation();
@@ -24,13 +19,14 @@ export const Checkout = () => {
 
   const createOrderMutation = useCreateOrder();
   const createPaymentMutation = useCreatePayment();
+  const { data: deliveryZones = [], isLoading: zonesLoading } = useDeliveryZones(true);
 
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
-    city: cities[0],
+    zoneId: '',
     address: '',
-    deliveryType: 'standard',
+    deliveryType: 'standard' as 'standard' | 'express',
     paymentMethod: 'payme' as 'payme' | 'click' | 'uzum' | 'cash',
     notes: '',
   });
@@ -39,8 +35,34 @@ export const Checkout = () => {
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState('');
 
-  const deliveryCost = formData.deliveryType === 'express' ? 50000 : 20000;
-  const totalAmount = getTotalPrice() + deliveryCost;
+  const selectedZone: DeliveryZone | undefined = useMemo(() => {
+    if (!formData.zoneId && deliveryZones.length > 0) return deliveryZones[0];
+    return deliveryZones.find((z) => z.id === formData.zoneId) ?? deliveryZones[0];
+  }, [formData.zoneId, deliveryZones]);
+
+  const subtotal = getTotalPrice();
+
+  const deliveryCost = useMemo(() => {
+    if (!selectedZone) return 20000;
+    const price = formData.deliveryType === 'express'
+      ? selectedZone.express_price
+      : selectedZone.standard_price;
+    if (
+      formData.deliveryType === 'standard' &&
+      selectedZone.free_threshold &&
+      selectedZone.free_threshold > 0 &&
+      subtotal >= selectedZone.free_threshold
+    ) {
+      return 0;
+    }
+    return price;
+  }, [selectedZone, formData.deliveryType, subtotal]);
+
+  const totalAmount = subtotal + deliveryCost;
+  const isFree = deliveryCost === 0 && formData.deliveryType === 'standard';
+
+  const cityLabel = (zone: DeliveryZone) =>
+    language === 'uz' ? zone.city_uz : zone.city_ru;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +72,10 @@ export const Checkout = () => {
       const user = getTelegramUser();
       const userId = user?.id || telegramUserId || 0;
 
-      // Create order
+      const city = selectedZone
+        ? (language === 'uz' ? selectedZone.city_uz : selectedZone.city_ru)
+        : '';
+
       const order = await createOrderMutation.mutateAsync({
         telegram_user_id: userId,
         items: items.map((item) => ({
@@ -67,8 +92,12 @@ export const Checkout = () => {
         customer_info: {
           name: formData.fullName,
           phone: formData.phone,
-          city: formData.city,
+          city,
           address: formData.address,
+          zone_id: selectedZone?.id,
+          region: selectedZone
+            ? (language === 'uz' ? selectedZone.region_uz : selectedZone.region_ru)
+            : '',
         },
         delivery_type: formData.deliveryType,
         delivery_cost: deliveryCost,
@@ -78,7 +107,6 @@ export const Checkout = () => {
 
       setOrderId(order.id);
 
-      // Handle payment
       if (formData.paymentMethod !== 'cash') {
         try {
           const paymentData = await createPaymentMutation.mutateAsync({
@@ -86,15 +114,13 @@ export const Checkout = () => {
             amount: totalAmount,
             paymentMethod: formData.paymentMethod,
           });
-
           if (paymentData.paymentUrl) {
-            // Redirect to payment page
             window.location.href = paymentData.paymentUrl;
             return;
           }
         } catch (paymentError) {
-          console.error('Payment creation error:', paymentError);
-          toast.error(language === 'ru' ? 'Ошибка создания платежа' : 'To\'lov yaratishda xatolik');
+          console.error('Payment error:', paymentError);
+          toast.error(language === 'ru' ? 'Ошибка создания платежа' : "To'lov yaratishda xatolik");
         }
       }
 
@@ -121,16 +147,12 @@ export const Checkout = () => {
       <Layout showBottomNav={false}>
         <div className="container mx-auto px-4 py-12 text-center">
           <CheckCircle className="w-24 h-24 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            {t('order_success')}
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('order_success')}</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-2">
             {t('order_number')}: <span className="font-mono">{orderId.slice(0, 8)}</span>
           </p>
           <p className="text-gray-600 dark:text-gray-400 mb-8">
-            {language === 'ru'
-              ? 'Мы свяжемся с вами в ближайшее время'
-              : 'Tez orada siz bilan bog\'lanamiz'}
+            {language === 'ru' ? 'Мы свяжемся с вами в ближайшее время' : "Tez orada siz bilan bog'lanamiz"}
           </p>
           <div className="space-y-3 max-w-md mx-auto">
             <button
@@ -151,184 +173,248 @@ export const Checkout = () => {
     );
   }
 
+  const daysLabel = (min: number, max: number) =>
+    `${min}${min !== max ? `–${max}` : ''} ${language === 'ru' ? (max === 1 ? 'день' : 'дн.') : 'kun'}`;
+
   return (
     <Layout showBottomNav={false}>
       <div className="container mx-auto px-4 py-4 pb-32">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-          {t('checkout')}
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">{t('checkout')}</h1>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {t('customer_info')}
-            </h2>
-
-            <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Customer info */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('customer_info')}</h2>
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('full_name')} *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('full_name')} *</label>
                 <input
                   type="text"
                   required
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('phone')} *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('phone')} *</label>
                 <input
                   type="tel"
                   required
                   placeholder="+998 90 123 45 67"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('city')} *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('address')} *</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Delivery */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('delivery')}</h2>
+
+            {/* City selector */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {language === 'ru' ? 'Город доставки' : 'Yetkazib berish shahri'} *
+              </label>
+              {zonesLoading ? (
+                <div className="h-11 bg-gray-100 dark:bg-gray-700 rounded-xl animate-pulse" />
+              ) : (
                 <select
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  value={formData.zoneId || (deliveryZones[0]?.id ?? '')}
+                  onChange={(e) => setFormData({ ...formData, zoneId: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
-                  {cities.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
+                  {deliveryZones.map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {cityLabel(zone)} — {language === 'uz' ? zone.region_uz : zone.region_ru}
                     </option>
                   ))}
                 </select>
-              </div>
+              )}
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('address')} *
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            {/* Free shipping notice */}
+            {selectedZone?.free_threshold && selectedZone.free_threshold > 0 && (
+              <div className={`flex items-center gap-2 text-xs rounded-xl px-3 py-2 mb-3 ${
+                subtotal >= selectedZone.free_threshold
+                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                  : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+              }`}>
+                <Tag className="w-3.5 h-3.5 flex-shrink-0" />
+                {subtotal >= selectedZone.free_threshold ? (
+                  <span>
+                    {language === 'ru'
+                      ? 'Бесплатная доставка!'
+                      : 'Bepul yetkazib berish!'}
+                  </span>
+                ) : (
+                  <span>
+                    {language === 'ru'
+                      ? `Бесплатно от ${formatPrice(selectedZone.free_threshold)} (+${formatPrice(selectedZone.free_threshold - subtotal)})`
+                      : `${formatPrice(selectedZone.free_threshold)} dan bepul (+${formatPrice(selectedZone.free_threshold - subtotal)})`}
+                  </span>
+                )}
               </div>
+            )}
+
+            {/* Delivery type cards */}
+            <div className="grid grid-cols-1 gap-2.5">
+              {/* Standard */}
+              <label className={`flex items-center justify-between p-3.5 border rounded-xl cursor-pointer transition-colors ${
+                formData.deliveryType === 'standard'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    formData.deliveryType === 'standard'
+                      ? 'bg-blue-100 dark:bg-blue-900/40'
+                      : 'bg-gray-100 dark:bg-gray-700'
+                  }`}>
+                    <Truck className={`w-4 h-4 ${formData.deliveryType === 'standard' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500'}`} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white text-sm">{t('delivery_standard')}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {selectedZone
+                        ? daysLabel(selectedZone.standard_days_min, selectedZone.standard_days_max)
+                        : language === 'ru' ? '3–5 дн.' : '3–5 kun'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    {isFree && formData.deliveryType === 'standard' ? (
+                      <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                        {language === 'ru' ? 'Бесплатно' : 'Bepul'}
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {selectedZone ? formatPrice(selectedZone.standard_price) : formatPrice(20000)}
+                      </span>
+                    )}
+                  </div>
+                  <input type="radio" name="delivery" value="standard"
+                    checked={formData.deliveryType === 'standard'}
+                    onChange={() => setFormData({ ...formData, deliveryType: 'standard' })}
+                    className="w-4 h-4 text-blue-500" />
+                </div>
+              </label>
+
+              {/* Express */}
+              <label className={`flex items-center justify-between p-3.5 border rounded-xl cursor-pointer transition-colors ${
+                formData.deliveryType === 'express'
+                  ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20'
+                  : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    formData.deliveryType === 'express'
+                      ? 'bg-orange-100 dark:bg-orange-900/40'
+                      : 'bg-gray-100 dark:bg-gray-700'
+                  }`}>
+                    <Zap className={`w-4 h-4 ${formData.deliveryType === 'express' ? 'text-orange-500' : 'text-gray-500'}`} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white text-sm">{t('delivery_express')}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {selectedZone
+                        ? daysLabel(selectedZone.express_days_min, selectedZone.express_days_max)
+                        : language === 'ru' ? '1–2 дн.' : '1–2 kun'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {selectedZone ? formatPrice(selectedZone.express_price) : formatPrice(50000)}
+                  </span>
+                  <input type="radio" name="delivery" value="express"
+                    checked={formData.deliveryType === 'express'}
+                    onChange={() => setFormData({ ...formData, deliveryType: 'express' })}
+                    className="w-4 h-4 text-blue-500" />
+                </div>
+              </label>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {t('delivery')}
-            </h2>
-
-            <div className="space-y-2">
-              <label className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {t('delivery_standard')}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {formatPrice(20000)} • 3-5 {language === 'ru' ? 'дней' : 'kun'}
-                  </p>
-                </div>
-                <input
-                  type="radio"
-                  name="delivery"
-                  value="standard"
-                  checked={formData.deliveryType === 'standard'}
-                  onChange={(e) => setFormData({ ...formData, deliveryType: e.target.value })}
-                  className="w-5 h-5 text-blue-500"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {t('delivery_express')}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {formatPrice(50000)} • 1-2 {language === 'ru' ? 'дня' : 'kun'}
-                  </p>
-                </div>
-                <input
-                  type="radio"
-                  name="delivery"
-                  value="express"
-                  checked={formData.deliveryType === 'express'}
-                  onChange={(e) => setFormData({ ...formData, deliveryType: e.target.value })}
-                  className="w-5 h-5 text-blue-500"
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {t('payment_method')}
-            </h2>
-
+          {/* Payment */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">{t('payment_method')}</h2>
             <div className="space-y-2">
               {[
                 { id: 'payme', icon: CreditCard, label: 'Payme', color: 'text-blue-600' },
                 { id: 'click', icon: CreditCard, label: 'Click', color: 'text-green-600' },
-                { id: 'uzum', icon: Smartphone, label: 'Uzum Bank', color: 'text-purple-600' },
+                { id: 'uzum', icon: Smartphone, label: 'Uzum Bank', color: 'text-violet-600' },
                 { id: 'cash', icon: CreditCard, label: t('payment_cash'), color: 'text-gray-600' },
               ].map(({ id, icon: Icon, label, color }) => (
                 <label
                   key={id}
-                  className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-colors ${
+                    formData.paymentMethod === id
+                      ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
                 >
-                  <div className="flex items-center space-x-3">
-                    <Icon className={`w-6 h-6 ${color}`} />
-                    <span className="font-medium text-gray-900 dark:text-white">{label}</span>
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-5 h-5 ${color}`} />
+                    <span className="font-medium text-gray-900 dark:text-white text-sm">{label}</span>
                   </div>
                   <input
                     type="radio"
                     name="payment"
                     value={id}
                     checked={formData.paymentMethod === id}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        paymentMethod: e.target.value as any,
-                      })
-                    }
-                    className="w-5 h-5 text-blue-500"
+                    onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value as any })}
+                    className="w-4 h-4 text-blue-500"
                   />
                 </label>
               ))}
             </div>
           </div>
 
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+          {/* Order Summary */}
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
+              {language === 'ru' ? 'Итого' : 'Jami'}
+            </h2>
             <div className="space-y-2">
-              <div className="flex justify-between text-gray-600 dark:text-gray-400">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                 <span>{language === 'ru' ? 'Товары' : 'Mahsulotlar'}:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {formatPrice(getTotalPrice())}
-                </span>
+                <span className="font-semibold text-gray-900 dark:text-white">{formatPrice(subtotal)}</span>
               </div>
-              <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                <span>{language === 'ru' ? 'Доставка' : 'Yetkazib berish'}:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {formatPrice(deliveryCost)}
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                <span>
+                  {language === 'ru' ? 'Доставка' : 'Yetkazib berish'}
+                  {selectedZone && (
+                    <span className="text-xs ml-1 text-gray-400">
+                      ({language === 'uz' ? selectedZone.city_uz : selectedZone.city_ru})
+                    </span>
+                  )}:
                 </span>
+                {isFree ? (
+                  <span className="font-semibold text-green-600 dark:text-green-400">
+                    {language === 'ru' ? 'Бесплатно' : 'Bepul'}
+                  </span>
+                ) : (
+                  <span className="font-semibold text-gray-900 dark:text-white">{formatPrice(deliveryCost)}</span>
+                )}
               </div>
-              <div className="border-t border-gray-300 dark:border-gray-600 pt-2 flex justify-between">
-                <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('total')}:
-                </span>
-                <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                  {formatPrice(totalAmount)}
-                </span>
+              <div className="border-t border-gray-200 dark:border-gray-600 pt-2 flex justify-between">
+                <span className="font-bold text-gray-900 dark:text-white">{t('total')}:</span>
+                <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatPrice(totalAmount)}</span>
               </div>
             </div>
           </div>
@@ -338,11 +424,11 @@ export const Checkout = () => {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition-colors disabled:bg-gray-400 flex items-center justify-center space-x-2"
+            className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 <span>{t('loading')}</span>
               </>
             ) : (
@@ -351,7 +437,8 @@ export const Checkout = () => {
                   ? t('place_order')
                   : language === 'ru'
                   ? 'Перейти к оплате'
-                  : 'To\'lovga o\'tish'}
+                  : "To'lovga o'tish"}
+                {' '}— {formatPrice(totalAmount)}
               </span>
             )}
           </button>

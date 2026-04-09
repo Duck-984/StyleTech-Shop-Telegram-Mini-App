@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Package, ShoppingBag, DollarSign, LogOut, Users, TrendingUp,
-  Image, BarChart2, ArrowUpRight, ShoppingCart,
+  Image, BarChart2, ArrowUpRight, ShoppingCart, Truck,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { getCurrentAdmin, logoutAdmin, canManageUsers, canManageOrders, canManageBanners, ROLE_LABELS } from '../../lib/auth';
+import { getCurrentAdmin, logoutAdmin, canManageUsers, canManageOrders, canManageBanners, canManageDelivery, ROLE_LABELS } from '../../lib/auth';
 import { formatPrice } from '../../lib/utils';
 
 interface SalesDay { date: string; revenue: number; orders: number }
@@ -299,8 +299,11 @@ export const AdminDashboard = () => {
             {canManageBanners(admin) && (
               <NavCard to="/admin/banners" color="orange" icon={<Image className="w-5 h-5" />} label="Баннеры" sub={`${stats.activeBanners} активных`} />
             )}
+            {canManageDelivery(admin) && (
+              <NavCard to="/admin/delivery" color="sky" icon={<Truck className="w-5 h-5" />} label="Доставка" sub="Тарифы по регионам" />
+            )}
             {canManageUsers(admin) && (
-              <NavCard to="/admin/users" color="sky" icon={<Users className="w-5 h-5" />} label="Пользователи" sub="Роли и доступы" />
+              <NavCard to="/admin/users" color="rose" icon={<Users className="w-5 h-5" />} label="Пользователи" sub="Роли и доступы" />
             )}
           </div>
 
@@ -428,7 +431,7 @@ function NavCard({
   to, color, icon, label, sub,
 }: {
   to: string;
-  color: 'blue' | 'green' | 'orange' | 'sky';
+  color: 'blue' | 'green' | 'orange' | 'sky' | 'rose';
   icon: React.ReactNode;
   label: string;
   sub: string;
@@ -449,6 +452,10 @@ function NavCard({
     sky: {
       wrap: 'hover:border-sky-300 dark:hover:border-sky-700',
       icon: 'bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 group-hover:bg-sky-100 dark:group-hover:bg-sky-900/40',
+    },
+    rose: {
+      wrap: 'hover:border-rose-300 dark:hover:border-rose-700',
+      icon: 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 group-hover:bg-rose-100 dark:group-hover:bg-rose-900/40',
     },
   };
   const c = colorMap[color];

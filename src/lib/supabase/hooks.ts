@@ -8,6 +8,7 @@ import {
   referralQueries,
   paymentQueries,
   bannerQueries,
+  deliveryZoneQueries,
 } from './queries';
 import type { Database } from '../supabase';
 
@@ -169,6 +170,44 @@ export const useRedeemReferral = () => {
       referralQueries.redeem(referralId, telegramId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['referrals'] });
+    },
+  });
+};
+
+// Delivery Zones
+export const useDeliveryZones = (activeOnly = true) => {
+  return useQuery({
+    queryKey: ['delivery_zones', activeOnly],
+    queryFn: () => activeOnly ? deliveryZoneQueries.getActive() : deliveryZoneQueries.getAll(),
+  });
+};
+
+export const useCreateDeliveryZone = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deliveryZoneQueries.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery_zones'] });
+    },
+  });
+};
+
+export const useUpdateDeliveryZone = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => deliveryZoneQueries.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery_zones'] });
+    },
+  });
+};
+
+export const useDeleteDeliveryZone = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deliveryZoneQueries.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery_zones'] });
     },
   });
 };
