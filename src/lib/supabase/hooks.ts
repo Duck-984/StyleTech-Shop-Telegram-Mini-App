@@ -7,6 +7,7 @@ import {
   promotionQueries,
   referralQueries,
   paymentQueries,
+  bannerQueries,
 } from './queries';
 import type { Database } from '../supabase';
 
@@ -168,6 +169,44 @@ export const useRedeemReferral = () => {
       referralQueries.redeem(referralId, telegramId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['referrals'] });
+    },
+  });
+};
+
+// Banners
+export const useBanners = (activeOnly = true) => {
+  return useQuery({
+    queryKey: ['banners', activeOnly],
+    queryFn: () => activeOnly ? bannerQueries.getActive() : bannerQueries.getAll(),
+  });
+};
+
+export const useCreateBanner = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bannerQueries.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banners'] });
+    },
+  });
+};
+
+export const useUpdateBanner = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => bannerQueries.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banners'] });
+    },
+  });
+};
+
+export const useDeleteBanner = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bannerQueries.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banners'] });
     },
   });
 };

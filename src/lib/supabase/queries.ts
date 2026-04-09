@@ -333,6 +333,67 @@ export const referralQueries = {
   },
 };
 
+export type Banner = {
+  id: string;
+  title: { ru: string; uz: string };
+  subtitle: { ru: string; uz: string };
+  image_url: string;
+  link_url: string | null;
+  link_label: { ru: string; uz: string } | null;
+  bg_color: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export const bannerQueries = {
+  getActive: async (): Promise<Banner[]> => {
+    const { data, error } = await supabase
+      .from('banners')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as Banner[];
+  },
+
+  getAll: async (): Promise<Banner[]> => {
+    const { data, error } = await supabase
+      .from('banners')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as Banner[];
+  },
+
+  create: async (banner: Omit<Banner, 'id' | 'created_at' | 'updated_at'>): Promise<Banner> => {
+    const { data, error } = await supabase
+      .from('banners')
+      .insert(banner)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Banner;
+  },
+
+  update: async (id: string, banner: Partial<Omit<Banner, 'id' | 'created_at' | 'updated_at'>>): Promise<Banner> => {
+    const { data, error } = await supabase
+      .from('banners')
+      .update({ ...banner, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Banner;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('banners').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
 export const paymentQueries = {
   createPayment: async (orderId: string, amount: number, paymentMethod: 'payme' | 'click' | 'uzum') => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

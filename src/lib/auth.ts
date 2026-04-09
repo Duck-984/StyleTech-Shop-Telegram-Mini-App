@@ -55,6 +55,10 @@ export function canManageProducts(user: AdminUser | null): boolean {
   return !!user;
 }
 
+export function canManageBanners(user: AdminUser | null): boolean {
+  return user?.role === 'admin' || user?.role === 'manager';
+}
+
 export const ROLE_LABELS: Record<AdminRole, string> = {
   admin: 'Администратор',
   manager: 'Менеджер',

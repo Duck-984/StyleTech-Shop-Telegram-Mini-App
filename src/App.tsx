@@ -12,6 +12,7 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminProducts } from './pages/admin/AdminProducts';
 import { AdminOrders } from './pages/admin/AdminOrders';
 import { AdminUsers } from './pages/admin/AdminUsers';
+import { AdminBanners } from './pages/admin/AdminBanners';
 import { AdminRoute } from './components/AdminRoute';
 import { ToastContainer } from './components/Toast';
 
@@ -71,6 +72,14 @@ function App() {
             element={
               <AdminRoute requiredRole="admin">
                 <AdminUsers />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/banners"
+            element={
+              <AdminRoute requiredRole="manager">
+                <AdminBanners />
               </AdminRoute>
             }
           />
