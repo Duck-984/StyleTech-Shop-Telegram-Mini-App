@@ -9,6 +9,7 @@ import {
   paymentQueries,
   bannerQueries,
   deliveryZoneQueries,
+  inventoryQueries,
 } from './queries';
 import type { Database } from '../supabase';
 
@@ -81,10 +82,42 @@ export const useUpdateOrderStatus = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      orderQueries.updateStatus(id, status),
+    mutationFn: ({ id, status, changedBy, note }: { id: string; status: string; changedBy?: string; note?: string }) =>
+      orderQueries.updateStatus(id, status, changedBy, note),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+};
+
+// Inventory
+export const useInventoryProducts = () => {
+  return useQuery({
+    queryKey: ['inventory_products'],
+    queryFn: () => inventoryQueries.getAllWithStock(),
+  });
+};
+
+export const useUpdateStock = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, newStock }: { productId: string; newStock: number }) =>
+      inventoryQueries.updateStock(productId, newStock),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory_products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+  });
+};
+
+export const useAdjustStock = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productId, delta }: { productId: string; delta: number }) =>
+      inventoryQueries.adjustStock(productId, delta),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory_products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
 };

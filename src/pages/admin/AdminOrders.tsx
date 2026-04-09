@@ -1,37 +1,60 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, ChevronDown, Clock, User, MapPin, Package, History } from 'lucide-react';
 import { supabase, Database } from '../../lib/supabase';
 import { getCurrentAdmin, ROLE_LABELS } from '../../lib/auth';
 import { formatPrice } from '../../lib/utils';
+import { toast } from '../../components/Toast';
 
 type Order = Database['public']['Tables']['orders']['Row'];
 
-const STATUS_OPTIONS = [
-  { value: 'new',        label: 'Новый',         cls: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' },
-  { value: 'processing', label: 'В обработке',    cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' },
-  { value: 'paid',       label: 'Оплачен',        cls: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' },
-  { value: 'shipped',    label: 'Отправлен',      cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' },
-  { value: 'delivered',  label: 'Доставлен',      cls: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' },
-  { value: 'cancelled',  label: 'Отменён',        cls: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' },
-];
+export const ORDER_STATUSES = [
+  { value: 'new',              label: 'Новый',         color: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',                   dot: 'bg-gray-400' },
+  { value: 'processing',       label: 'В обработке',   color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',                  dot: 'bg-blue-500' },
+  { value: 'assembling',       label: 'В сборке',      color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',           dot: 'bg-yellow-500' },
+  { value: 'assembled',        label: 'Собран',        color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',               dot: 'bg-amber-500' },
+  { value: 'shipping',         label: 'В доставке',    color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',           dot: 'bg-orange-500' },
+  { value: 'delivered',        label: 'Доставлен',     color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',       dot: 'bg-emerald-500' },
+  { value: 'cancelled',        label: 'Отменён',       color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',                      dot: 'bg-red-500' },
+  { value: 'return_requested', label: 'Возврат',       color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',                   dot: 'bg-rose-500' },
+  { value: 'returned',         label: 'Возвращён',     color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',                  dot: 'bg-slate-400' },
+  { value: 'paid',             label: 'Оплачен',       color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',               dot: 'bg-green-500' },
+  { value: 'shipped',          label: 'Отправлен',     color: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',           dot: 'bg-violet-500' },
+] as const;
 
-const getStatusInfo = (value: string) =>
-  STATUS_OPTIONS.find((s) => s.value === value) ?? STATUS_OPTIONS[0];
+export const getStatusInfo = (value: string) =>
+  ORDER_STATUSES.find((s) => s.value === value) ?? ORDER_STATUSES[0];
+
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('ru-RU', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const info = getStatusInfo(status);
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${info.color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${info.dot}`} />
+      {info.label}
+    </span>
+  );
+};
 
 export const AdminOrders = () => {
-  const navigate = useNavigate();
   const admin = getCurrentAdmin();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const [historyId, setHistoryId] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadOrders();
 
     const channel = supabase
-      .channel('admin-orders')
+      .channel('admin-orders-v2')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, loadOrders)
       .subscribe();
 
@@ -41,27 +64,64 @@ export const AdminOrders = () => {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const { data, error: err } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
-      if (err) throw err;
+      if (error) throw error;
       setOrders(data ?? []);
     } catch {
-      setError('Не удалось загрузить заказы.');
+      toast.error('Не удалось загрузить заказы.');
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStatus = async (id: string, status: string) => {
-    const { error: err } = await supabase
-      .from('orders')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (err) { setError('Ошибка при обновлении статуса.'); return; }
-    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status } : o));
+  const updateStatus = async (orderId: string, newStatus: string) => {
+    if (updatingId) return;
+    setUpdatingId(orderId);
+    try {
+      const current = orders.find((o) => o.id === orderId);
+      const history: any[] = Array.isArray((current as any)?.status_history)
+        ? (current as any).status_history
+        : [];
+
+      const newEntry = {
+        status: newStatus,
+        changed_at: new Date().toISOString(),
+        changed_by: admin?.first_name ?? 'Admin',
+      };
+
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: newStatus,
+          status_history: [...history, newEntry],
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? { ...o, status: newStatus, status_history: [...history, newEntry] as any }
+            : o
+        )
+      );
+      const label = getStatusInfo(newStatus).label;
+      toast.success(`Статус изменён: ${label}`);
+    } catch {
+      toast.error('Ошибка при обновлении статуса.');
+    } finally {
+      setUpdatingId(null);
+    }
   };
+
+  const filtered = filterStatus
+    ? orders.filter((o) => o.status === filterStatus)
+    : orders;
 
   if (!admin) return null;
 
@@ -76,13 +136,13 @@ export const AdminOrders = () => {
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <h1 className="text-lg font-bold text-gray-900 dark:text-white">Заказы</h1>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">Заказы</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{orders.length} всего</p>
+            </div>
           </div>
-
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold text-gray-900 dark:text-white leading-none">
-              {admin.first_name}
-            </p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white leading-none">{admin.first_name}</p>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
               admin.role === 'admin'
                 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
@@ -94,27 +154,54 @@ export const AdminOrders = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {error && (
-          <div className="mb-5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl px-4 py-3 text-sm">
-            {error}
-          </div>
-        )}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <div className="mb-5 flex gap-2 flex-wrap">
+          <button
+            onClick={() => setFilterStatus('')}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-full transition ${
+              filterStatus === ''
+                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
+                : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'
+            }`}
+          >
+            Все ({orders.length})
+          </button>
+          {ORDER_STATUSES.map((s) => {
+            const count = orders.filter((o) => o.status === s.value).length;
+            if (count === 0) return null;
+            return (
+              <button
+                key={s.value}
+                onClick={() => setFilterStatus(s.value)}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-full transition ${
+                  filterStatus === s.value
+                    ? `${s.color} ring-2 ring-offset-1 ring-current`
+                    : `${s.color} opacity-70 hover:opacity-100`
+                }`}
+              >
+                {s.label} ({count})
+              </button>
+            );
+          })}
+        </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <span className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : orders.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-gray-400 dark:text-gray-500 text-sm">
-            Заказов пока нет
+            {filterStatus ? `Нет заказов со статусом "${getStatusInfo(filterStatus).label}"` : 'Заказов пока нет'}
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {orders.map((order) => {
-              const statusInfo = getStatusInfo(order.status ?? 'new');
+            {filtered.map((order) => {
               const expanded = expandedId === order.id;
+              const showHistory = historyId === order.id;
               const info = order.customer_info as any;
+              const history: any[] = Array.isArray((order as any).status_history)
+                ? (order as any).status_history
+                : [];
 
               return (
                 <div
@@ -122,32 +209,33 @@ export const AdminOrders = () => {
                   className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden"
                 >
                   <div className="px-5 py-4">
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-start justify-between gap-2 mb-3">
                           <div>
                             <p className="font-bold text-gray-900 dark:text-white text-sm">
                               #{order.id.slice(0, 8).toUpperCase()}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                              {new Date(order.created_at).toLocaleDateString('ru-RU', {
-                                day: 'numeric', month: 'short', year: 'numeric',
-                                hour: '2-digit', minute: '2-digit',
-                              })}
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatDate(order.created_at)}
                             </p>
                           </div>
-                          <p className="text-xl font-bold text-gray-900 dark:text-white">
+                          <p className="text-xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
                             {formatPrice(Number(order.total_amount))}
                           </p>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
+                          <StatusBadge status={order.status ?? 'new'} />
+
                           <select
                             value={order.status ?? 'new'}
                             onChange={(e) => updateStatus(order.id, e.target.value)}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 outline-none cursor-pointer focus:ring-2 focus:ring-blue-500 ${statusInfo.cls}`}
+                            disabled={updatingId === order.id}
+                            className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
                           >
-                            {STATUS_OPTIONS.map((s) => (
+                            {ORDER_STATUSES.map((s) => (
                               <option key={s.value} value={s.value}>{s.label}</option>
                             ))}
                           </select>
@@ -162,23 +250,66 @@ export const AdminOrders = () => {
                               {order.delivery_type}
                             </span>
                           )}
+
+                          {history.length > 0 && (
+                            <button
+                              onClick={() => setHistoryId(showHistory ? null : order.id)}
+                              className="text-xs px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 font-medium flex items-center gap-1 transition"
+                            >
+                              <History className="w-3 h-3" />
+                              История ({history.length})
+                            </button>
+                          )}
                         </div>
                       </div>
 
                       <button
                         onClick={() => setExpandedId(expanded ? null : order.id)}
-                        className="p-2 rounded-lg text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition flex-shrink-0"
+                        className="p-2 rounded-lg text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition flex-shrink-0 mt-1"
                       >
                         <ChevronDown className={`w-5 h-5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
                       </button>
                     </div>
                   </div>
 
+                  {showHistory && history.length > 0 && (
+                    <div className="border-t border-gray-100 dark:border-gray-700 px-5 py-4 bg-blue-50/40 dark:bg-blue-900/10">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                        <History className="w-3.5 h-3.5" />
+                        История изменений
+                      </p>
+                      <div className="space-y-2.5">
+                        {[...history].reverse().map((entry: any, i: number) => (
+                          <div key={i} className="flex items-start gap-3">
+                            <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${getStatusInfo(entry.status).dot}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                                  {getStatusInfo(entry.status).label}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  — {entry.changed_by}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                                {formatDate(entry.changed_at)}
+                              </p>
+                              {entry.note && (
+                                <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 italic">{entry.note}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {expanded && (
                     <div className="border-t border-gray-100 dark:border-gray-700 px-5 py-4 bg-gray-50/50 dark:bg-gray-700/20 space-y-4">
                       {info && (
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5" />
                             Покупатель
                           </p>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
@@ -194,6 +325,17 @@ export const AdminOrders = () => {
                                 <p className="font-medium text-gray-900 dark:text-white">{info.phone}</p>
                               </div>
                             )}
+                          </div>
+                        </div>
+                      )}
+
+                      {info && (info.city || info.address) && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5" />
+                            Адрес доставки
+                          </p>
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                             {info.city && (
                               <div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Город</p>
@@ -212,7 +354,8 @@ export const AdminOrders = () => {
 
                       {Array.isArray(order.items) && order.items.length > 0 && (
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                            <Package className="w-3.5 h-3.5" />
                             Товары
                           </p>
                           <div className="space-y-1.5">
@@ -224,7 +367,7 @@ export const AdminOrders = () => {
                                   {item.color && <span className="text-gray-500"> / {item.color?.name ?? item.color}</span>}
                                   {' '}× {item.quantity}
                                 </span>
-                                <span className="font-semibold text-gray-900 dark:text-white">
+                                <span className="font-semibold text-gray-900 dark:text-white ml-3 whitespace-nowrap">
                                   {formatPrice(Number(item.price) * Number(item.quantity))}
                                 </span>
                               </div>

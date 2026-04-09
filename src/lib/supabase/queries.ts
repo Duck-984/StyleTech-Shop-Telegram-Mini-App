@@ -126,6 +126,46 @@ export const productQueries = {
   },
 };
 
+export const inventoryQueries = {
+  updateStock: async (productId: string, newStock: number) => {
+    const { data, error } = await supabase
+      .from('products')
+      .update({ stock: newStock, updated_at: new Date().toISOString() })
+      .eq('id', productId)
+      .select('id, stock')
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  adjustStock: async (productId: string, delta: number) => {
+    const { data: current, error: fetchErr } = await supabase
+      .from('products')
+      .select('stock')
+      .eq('id', productId)
+      .single();
+    if (fetchErr) throw fetchErr;
+    const newStock = Math.max(0, (current?.stock ?? 0) + delta);
+    const { data, error } = await supabase
+      .from('products')
+      .update({ stock: newStock, updated_at: new Date().toISOString() })
+      .eq('id', productId)
+      .select('id, stock')
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  getAllWithStock: async () => {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, slug, price, stock, images, is_active, category_id')
+      .order('stock', { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  },
+};
+
 export const categoryQueries = {
   getAll: async () => {
     const { data, error } = await supabase
@@ -172,10 +212,32 @@ export const orderQueries = {
     return data;
   },
 
-  updateStatus: async (id: string, status: string) => {
+  updateStatus: async (id: string, status: string, changedBy = 'admin', note?: string) => {
+    const { data: current, error: fetchErr } = await supabase
+      .from('orders')
+      .select('status_history')
+      .eq('id', id)
+      .single();
+    if (fetchErr) throw fetchErr;
+
+    const history: any[] = Array.isArray((current as any)?.status_history)
+      ? (current as any).status_history
+      : [];
+
+    const newEntry = {
+      status,
+      changed_at: new Date().toISOString(),
+      changed_by: changedBy,
+      ...(note ? { note } : {}),
+    };
+
     const { data, error } = await supabase
       .from('orders')
-      .update({ status })
+      .update({
+        status,
+        status_history: [...history, newEntry],
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id)
       .select()
       .single();
