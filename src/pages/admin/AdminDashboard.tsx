@@ -7,6 +7,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { getCurrentAdmin, logoutAdmin, canManageUsers, canManageOrders, canManageBanners, canManageDelivery, ROLE_LABELS } from '../../lib/auth';
 import { formatPrice } from '../../lib/utils';
+import { getStatusInfo } from '../../lib/orderStatuses';
 
 interface SalesDay { date: string; revenue: number; orders: number }
 interface TopProduct { name: string; orders: number; revenue: number }
@@ -37,26 +38,18 @@ const EMPTY_STATS: DashStats = {
   activeBanners: 0,
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  new: 'Новый', processing: 'В обработке', paid: 'Оплачен',
-  shipped: 'Отправлен', delivered: 'Доставлен', cancelled: 'Отменён',
-};
-const STATUS_COLORS: Record<string, string> = {
-  new: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
-  processing: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-  paid: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-  shipped: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
-  delivered: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
-  cancelled: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-};
-
 const STATUS_BAR_COLORS: Record<string, string> = {
   new: 'bg-gray-400',
   processing: 'bg-blue-500',
-  paid: 'bg-green-500',
-  shipped: 'bg-orange-500',
+  assembling: 'bg-yellow-500',
+  assembled: 'bg-amber-500',
+  shipping: 'bg-orange-500',
   delivered: 'bg-emerald-500',
   cancelled: 'bg-red-400',
+  return_requested: 'bg-rose-500',
+  returned: 'bg-slate-400',
+  paid: 'bg-green-500',
+  shipped: 'bg-blue-400',
 };
 
 export const AdminDashboard = () => {
@@ -271,7 +264,7 @@ export const AdminDashboard = () => {
                   return (
                     <div key={status}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-600 dark:text-gray-400">{STATUS_LABELS[status] ?? status}</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">{getStatusInfo(status).label_ru}</span>
                         <span className="text-xs font-semibold text-gray-900 dark:text-white">{count} ({pct}%)</span>
                       </div>
                       <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -382,8 +375,8 @@ export const AdminDashboard = () => {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[order.status] ?? STATUS_COLORS.new}`}>
-                        {STATUS_LABELS[order.status] ?? order.status}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${getStatusInfo(order.status).color}`}>
+                        {getStatusInfo(order.status).label_ru}
                       </span>
                       <p className="text-xs font-bold text-gray-900 dark:text-white whitespace-nowrap">
                         {formatPrice(Number(order.total_amount))}

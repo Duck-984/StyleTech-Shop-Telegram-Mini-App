@@ -173,17 +173,6 @@ export const Orders = () => {
                   </div>
                 </div>
 
-                {order.status === 'new' && order.payment_method !== 'cash' && (
-                  <button
-                    onClick={() => {
-                      // TODO: Implement payment retry
-                      navigate(`/payment/${order.id}`);
-                    }}
-                    className="w-full mt-4 bg-blue-500 text-white py-2 rounded-lg font-semibold hover:bg-blue-600 transition-colors"
-                  >
-                    {language === 'ru' ? 'Оплатить заказ' : 'Buyurtmani to\'lash'}
-                  </button>
-                )}
               </div>
             </div>
           ))}
