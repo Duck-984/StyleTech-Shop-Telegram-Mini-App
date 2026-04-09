@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { ProductCard } from '../components/ProductCard';
+import { BannerSlider } from '../components/BannerSlider';
 import { useTranslation } from '../hooks/useTranslation';
-import { useProducts, useCategories } from '../lib/supabase/hooks';
+import { useProducts, useCategories, useBanners } from '../lib/supabase/hooks';
 import { getLocalizedValue } from '../lib/utils';
 
 export const Catalog = () => {
@@ -20,6 +21,7 @@ export const Catalog = () => {
   const [inStockOnly, setInStockOnly] = useState(false);
 
   const { data: categories = [] } = useCategories();
+  const { data: banners = [] } = useBanners(true);
 
   const filters = {
     categoryId: selectedCategory,
@@ -84,6 +86,11 @@ export const Catalog = () => {
 
   return (
     <Layout>
+      {banners.length > 0 && (
+        <div className="mb-4">
+          <BannerSlider banners={banners} language={language} />
+        </div>
+      )}
       <div className="container mx-auto px-4 py-4">
         <div className="mb-4 space-y-3">
           <div className="relative">
