@@ -12,11 +12,12 @@ export function formatPrice(price: number): string {
   }).format(price) + ' сум';
 }
 
-export function getLocalizedValue<T extends { ru: string; uz: string }>(
-  value: T | undefined,
+export function getLocalizedValue(
+  value: { ru: string; uz: string } | string | undefined | null,
   language: 'ru' | 'uz'
 ): string {
   if (!value) return '';
+  if (typeof value === 'string') return value;
   return value[language] || value.ru || '';
 }
 

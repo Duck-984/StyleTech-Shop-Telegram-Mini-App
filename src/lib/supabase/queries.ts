@@ -41,7 +41,7 @@ export const productQueries = {
       query = query.lte('price', filters.maxPrice);
     }
 
-    if (filters?.search) {
+    if (filters?.search && filters.search.trim().length > 0) {
       query = query.or(`name->ru.ilike.%${filters.search}%,name->uz.ilike.%${filters.search}%,description->ru.ilike.%${filters.search}%,description->uz.ilike.%${filters.search}%`);
     }
 
@@ -548,10 +548,13 @@ export const bannerQueries = {
 export const paymentQueries = {
   createPayment: async (orderId: string, amount: number, paymentMethod: 'payme' | 'click' | 'uzum') => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     const response = await fetch(`${supabaseUrl}/functions/v1/create-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${anonKey}`,
+        'Apikey': anonKey,
       },
       body: JSON.stringify({ orderId, amount, paymentMethod }),
     });

@@ -40,9 +40,9 @@ export const Cart = () => {
         </h1>
 
         <div className="space-y-4 mb-24">
-          {items.map((item, index) => (
+          {items.map((item) => (
             <div
-              key={`${item.productId}-${item.size}-${item.color?.hex}-${index}`}
+              key={`${item.productId}-${item.size ?? ''}-${item.color?.hex ?? ''}`}
               className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm"
             >
               <div className="flex space-x-4">

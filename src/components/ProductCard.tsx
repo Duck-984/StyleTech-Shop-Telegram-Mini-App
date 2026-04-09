@@ -10,7 +10,7 @@ interface ProductCardProps {
 }
 
 export const ProductCard = ({ product }: ProductCardProps) => {
-  const { language } = useTranslation();
+  const { language, t } = useTranslation();
 
   return (
     <Link
@@ -31,7 +31,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
         )}
         {product.stock === 0 && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <span className="text-white font-semibold">Нет в наличии</span>
+            <span className="text-white font-semibold">{t('out_of_stock')}</span>
           </div>
         )}
       </div>
@@ -47,7 +47,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           </span>
           {product.stock > 0 && product.stock < 10 && (
             <span className="text-xs text-orange-500">
-              Осталось: {product.stock}
+              {language === 'ru' ? 'Осталось' : 'Qoldi'}: {product.stock}
             </span>
           )}
         </div>
