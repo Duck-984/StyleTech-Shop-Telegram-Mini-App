@@ -5,25 +5,9 @@ import { supabase, Database } from '../../lib/supabase';
 import { getCurrentAdmin, ROLE_LABELS } from '../../lib/auth';
 import { formatPrice } from '../../lib/utils';
 import { toast } from '../../components/Toast';
+import { ORDER_STATUSES, getStatusInfo } from '../../lib/orderStatuses';
 
 type Order = Database['public']['Tables']['orders']['Row'];
-
-export const ORDER_STATUSES = [
-  { value: 'new',              label: 'Новый',         color: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',                   dot: 'bg-gray-400' },
-  { value: 'processing',       label: 'В обработке',   color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',                  dot: 'bg-blue-500' },
-  { value: 'assembling',       label: 'В сборке',      color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',           dot: 'bg-yellow-500' },
-  { value: 'assembled',        label: 'Собран',        color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',               dot: 'bg-amber-500' },
-  { value: 'shipping',         label: 'В доставке',    color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',           dot: 'bg-orange-500' },
-  { value: 'delivered',        label: 'Доставлен',     color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',       dot: 'bg-emerald-500' },
-  { value: 'cancelled',        label: 'Отменён',       color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',                      dot: 'bg-red-500' },
-  { value: 'return_requested', label: 'Возврат',       color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',                   dot: 'bg-rose-500' },
-  { value: 'returned',         label: 'Возвращён',     color: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',                  dot: 'bg-slate-400' },
-  { value: 'paid',             label: 'Оплачен',       color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',               dot: 'bg-green-500' },
-  { value: 'shipped',          label: 'Отправлен',     color: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',           dot: 'bg-violet-500' },
-] as const;
-
-export const getStatusInfo = (value: string) =>
-  ORDER_STATUSES.find((s) => s.value === value) ?? ORDER_STATUSES[0];
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('ru-RU', {
@@ -36,7 +20,7 @@ const StatusBadge = ({ status }: { status: string }) => {
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${info.color}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${info.dot}`} />
-      {info.label}
+      {info.label_ru}
     </span>
   );
 };
@@ -110,7 +94,7 @@ export const AdminOrders = () => {
             : o
         )
       );
-      const label = getStatusInfo(newStatus).label;
+      const label = getStatusInfo(newStatus).label_ru;
       toast.success(`Статус изменён: ${label}`);
     } catch {
       toast.error('Ошибка при обновлении статуса.');
@@ -179,7 +163,7 @@ export const AdminOrders = () => {
                     : `${s.color} opacity-70 hover:opacity-100`
                 }`}
               >
-                {s.label} ({count})
+                {s.label_ru} ({count})
               </button>
             );
           })}
@@ -191,7 +175,7 @@ export const AdminOrders = () => {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-gray-400 dark:text-gray-500 text-sm">
-            {filterStatus ? `Нет заказов со статусом "${getStatusInfo(filterStatus).label}"` : 'Заказов пока нет'}
+            {filterStatus ? `Нет заказов со статусом "${getStatusInfo(filterStatus).label_ru}"` : 'Заказов пока нет'}
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -236,7 +220,7 @@ export const AdminOrders = () => {
                             className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
                           >
                             {ORDER_STATUSES.map((s) => (
-                              <option key={s.value} value={s.value}>{s.label}</option>
+                              <option key={s.value} value={s.value}>{s.label_ru}</option>
                             ))}
                           </select>
 
@@ -285,7 +269,7 @@ export const AdminOrders = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                                  {getStatusInfo(entry.status).label}
+                                  {getStatusInfo(entry.status).label_ru}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
                                   — {entry.changed_by}

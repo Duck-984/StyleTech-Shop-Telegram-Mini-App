@@ -166,6 +166,29 @@ export const inventoryQueries = {
   },
 };
 
+export const userQueries = {
+  getByTelegramId: async (telegramId: number) => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('telegram_id', telegramId)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  updateProfile: async (telegramId: number, updates: { phone?: string; address?: string; first_name?: string }) => {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('telegram_id', telegramId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+};
+
 export const categoryQueries = {
   getAll: async () => {
     const { data, error } = await supabase

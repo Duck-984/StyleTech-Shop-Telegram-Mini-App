@@ -120,23 +120,6 @@ export const AdminLogin = () => {
             </form>
           </div>
 
-          <div className="px-8 pb-8">
-            <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 p-4">
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                Данные для входа
-              </p>
-              <div className="font-mono text-sm text-gray-800 dark:text-gray-200 space-y-1">
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Email:&nbsp;</span>
-                  admin@shop.uz
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Пароль:&nbsp;</span>
-                  Admin123
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

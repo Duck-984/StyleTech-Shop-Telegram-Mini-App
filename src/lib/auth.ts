@@ -9,25 +9,24 @@ export interface AdminUser {
 
 const STORAGE_KEY = 'styletech_admin';
 
-const CREDENTIALS: Record<string, { password: string; user: AdminUser }> = {
-  'admin@shop.uz': {
-    password: 'Admin123',
-    user: {
-      id: 'admin-001',
-      first_name: 'Администратор',
-      email: 'admin@shop.uz',
-      role: 'admin',
-    },
-  },
-};
-
 export function loginAdmin(email: string, password: string): AdminUser | null {
-  const entry = CREDENTIALS[email.trim().toLowerCase()];
-  if (!entry || entry.password !== password) {
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+
+  if (!adminEmail || !adminPassword) return null;
+  if (email.trim().toLowerCase() !== adminEmail.toLowerCase() || password !== adminPassword) {
     return null;
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entry.user));
-  return entry.user;
+
+  const user: AdminUser = {
+    id: 'admin-001',
+    first_name: 'Администратор',
+    email: adminEmail,
+    role: 'admin',
+  };
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  return user;
 }
 
 export function getCurrentAdmin(): AdminUser | null {

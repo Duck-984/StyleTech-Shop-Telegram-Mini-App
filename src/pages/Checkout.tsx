@@ -64,8 +64,33 @@ export const Checkout = () => {
   const cityLabel = (zone: DeliveryZone) =>
     language === 'uz' ? zone.city_uz : zone.city_ru;
 
+  const validateForm = (): string | null => {
+    const name = formData.fullName.trim();
+    const phone = formData.phone.trim();
+    const address = formData.address.trim();
+
+    if (name.length < 2) {
+      return language === 'ru' ? 'Введите ваше имя (минимум 2 символа)' : 'Ismingizni kiriting (kamida 2 belgi)';
+    }
+    const phoneClean = phone.replace(/[\s\-()]/g, '');
+    if (!/^\+?[0-9]{9,13}$/.test(phoneClean)) {
+      return language === 'ru' ? 'Введите корректный номер телефона' : "To'g'ri telefon raqam kiriting";
+    }
+    if (address.length < 5) {
+      return language === 'ru' ? 'Введите адрес доставки (минимум 5 символов)' : "Yetkazib berish manzilini kiriting (kamida 5 belgi)";
+    }
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const validationError = validateForm();
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     setLoading(true);
 
     try {

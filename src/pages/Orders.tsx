@@ -1,4 +1,4 @@
-import { Package, ChevronRight } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { useTranslation } from '../hooks/useTranslation';
@@ -6,6 +6,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useOrders } from '../lib/supabase/hooks';
 import { formatPrice, getLocalizedValue } from '../lib/utils';
 import { getTelegramUser } from '../lib/telegram';
+import { getStatusColor, getStatusLabel } from '../lib/orderStatuses';
 
 export const Orders = () => {
   const { t, language } = useTranslation();
@@ -16,37 +17,6 @@ export const Orders = () => {
   const userId = user?.id || telegramUserId || 0;
 
   const { data: orders = [], isLoading } = useOrders(userId);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'processing':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'paid':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'shipped':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case 'delivered':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, { ru: string; uz: string }> = {
-      new: { ru: 'Новый', uz: 'Yangi' },
-      processing: { ru: 'В обработке', uz: 'Jarayonda' },
-      paid: { ru: 'Оплачен', uz: 'To\'langan' },
-      shipped: { ru: 'Отправлен', uz: 'Yuborilgan' },
-      delivered: { ru: 'Доставлен', uz: 'Yetkazilgan' },
-      cancelled: { ru: 'Отменен', uz: 'Bekor qilingan' },
-    };
-    return labels[status]?.[language] || status;
-  };
 
   const getPaymentMethodLabel = (method: string) => {
     const labels: Record<string, { ru: string; uz: string }> = {
@@ -128,7 +98,7 @@ export const Orders = () => {
                       order.status
                     )}`}
                   >
-                    {getStatusLabel(order.status)}
+                    {getStatusLabel(order.status, language)}
                   </span>
                 </div>
 

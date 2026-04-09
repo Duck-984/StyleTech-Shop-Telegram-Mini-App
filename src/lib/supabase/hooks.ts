@@ -10,6 +10,7 @@ import {
   bannerQueries,
   deliveryZoneQueries,
   inventoryQueries,
+  userQueries,
 } from './queries';
 import type { Database } from '../supabase';
 
@@ -38,6 +39,26 @@ export const useIncrementViews = () => {
 export const useUploadProductImages = () => {
   return useMutation({
     mutationFn: (files: File[]) => productQueries.uploadImages(files),
+  });
+};
+
+// Users
+export const useUserProfile = (telegramId: number) => {
+  return useQuery({
+    queryKey: ['user_profile', telegramId],
+    queryFn: () => userQueries.getByTelegramId(telegramId),
+    enabled: !!telegramId,
+  });
+};
+
+export const useUpdateProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ telegramId, updates }: { telegramId: number; updates: { phone?: string; address?: string; first_name?: string } }) =>
+      userQueries.updateProfile(telegramId, updates),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['user_profile', variables.telegramId] });
+    },
   });
 };
 

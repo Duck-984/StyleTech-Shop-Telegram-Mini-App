@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User, Globe, Shield, ChevronDown, ChevronRight,
@@ -8,31 +8,10 @@ import { Layout } from '../components/Layout';
 import { useTranslation } from '../hooks/useTranslation';
 import { useAppStore } from '../store/useAppStore';
 import { getTelegramUser } from '../lib/telegram';
-import { useOrders, useUserReferrals } from '../lib/supabase/hooks';
+import { useOrders, useUserReferrals, useUserProfile, useUpdateProfile } from '../lib/supabase/hooks';
 import { formatPrice } from '../lib/utils';
 import { toast } from '../components/Toast';
-
-const STATUS_INFO: Record<string, { label_ru: string; label_uz: string; color: string }> = {
-  new:              { label_ru: 'Новый',         label_uz: 'Yangi',                  color: 'bg-gray-100 text-gray-600' },
-  processing:       { label_ru: 'В обработке',   label_uz: "Ko'rib chiqilmoqda",     color: 'bg-blue-100 text-blue-600' },
-  assembling:       { label_ru: 'В сборке',      label_uz: "Yig'ilmoqda",            color: 'bg-yellow-100 text-yellow-700' },
-  assembled:        { label_ru: 'Собран',        label_uz: "Yig'ildi",               color: 'bg-amber-100 text-amber-700' },
-  shipping:         { label_ru: 'В доставке',    label_uz: 'Yetkazilmoqda',          color: 'bg-orange-100 text-orange-700' },
-  delivered:        { label_ru: 'Доставлен',     label_uz: 'Yetkazildi',             color: 'bg-emerald-100 text-emerald-700' },
-  cancelled:        { label_ru: 'Отменён',       label_uz: 'Bekor qilindi',          color: 'bg-red-100 text-red-600' },
-  return_requested: { label_ru: 'Возврат',       label_uz: 'Qaytarish',              color: 'bg-rose-100 text-rose-600' },
-  returned:         { label_ru: 'Возвращён',     label_uz: 'Qaytarildi',             color: 'bg-slate-100 text-slate-600' },
-  paid:             { label_ru: 'Оплачен',       label_uz: "To'langan",              color: 'bg-green-100 text-green-600' },
-  shipped:          { label_ru: 'Отправлен',     label_uz: 'Yuborilgan',             color: 'bg-violet-100 text-violet-600' },
-};
-
-const getStatusLabel = (status: string, lang: 'ru' | 'uz') => {
-  const info = STATUS_INFO[status];
-  if (!info) return status;
-  return lang === 'ru' ? info.label_ru : info.label_uz;
-};
-
-const getStatusColor = (status: string) => STATUS_INFO[status]?.color ?? 'bg-gray-100 text-gray-600';
+import { getStatusLabel, getStatusColor } from '../lib/orderStatuses';
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('ru-RU', {
@@ -48,11 +27,14 @@ export const Profile = () => {
 
   const { data: orders = [], isLoading: ordersLoading } = useOrders(userId);
   const { data: referrals = [] } = useUserReferrals(userId);
+  const { data: userProfile } = useUserProfile(userId);
+  const updateProfileMutation = useUpdateProfile();
 
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [profileData, setProfileData] = useState({
     name: user?.first_name ?? '',
@@ -60,6 +42,38 @@ export const Profile = () => {
     phone: '',
     address: '',
   });
+
+  useEffect(() => {
+    if (userProfile) {
+      setProfileData((prev) => ({
+        ...prev,
+        name: userProfile.first_name || user?.first_name || '',
+        phone: userProfile.phone || '',
+        address: userProfile.address || '',
+      }));
+    }
+  }, [userProfile, user?.first_name]);
+
+  const handleSaveProfile = async () => {
+    if (!userId) return;
+    setSaving(true);
+    try {
+      await updateProfileMutation.mutateAsync({
+        telegramId: userId,
+        updates: {
+          first_name: profileData.name,
+          phone: profileData.phone,
+          address: profileData.address,
+        },
+      });
+      setEditMode(false);
+      toast.success(language === 'ru' ? 'Профиль сохранён' : 'Profil saqlandi');
+    } catch {
+      toast.error(language === 'ru' ? 'Ошибка сохранения' : 'Saqlashda xatolik');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleCopyReferral = () => {
     if (!referrals[0]) return;
@@ -152,12 +166,11 @@ export const Profile = () => {
                 />
               </div>
               <button
-                onClick={() => {
-                  setEditMode(false);
-                  toast.success(language === 'ru' ? 'Профиль сохранён' : 'Profil saqlandi');
-                }}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-semibold text-sm transition"
+                onClick={handleSaveProfile}
+                disabled={saving}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2.5 rounded-xl font-semibold text-sm transition flex items-center justify-center gap-2"
               >
+                {saving && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
                 {t('save_profile')}
               </button>
             </div>
@@ -215,10 +228,8 @@ export const Profile = () => {
               {orders.map((order) => {
                 const expanded = expandedOrderId === order.id;
                 const historyOpen = showHistory === order.id;
-                const info = order.customer_info as any;
-                const history: any[] = Array.isArray((order as any).status_history)
-                  ? (order as any).status_history
-                  : [];
+                const info = order.customer_info as { name?: string; phone?: string; city?: string };
+                const history = Array.isArray(order.status_history) ? order.status_history : [];
 
                 return (
                   <div key={order.id}>
@@ -279,10 +290,10 @@ export const Profile = () => {
                               {language === 'ru' ? 'Товары' : 'Mahsulotlar'}
                             </p>
                             <div className="space-y-1">
-                              {(order.items as any[]).map((item: any, i: number) => (
+                              {(order.items as Array<{ name: { ru: string; uz: string } | string; size?: string; quantity: number; price: number }>).map((item, i) => (
                                 <div key={i} className="flex justify-between text-sm">
                                   <span className="text-gray-700 dark:text-gray-300 truncate max-w-[65%]">
-                                    {item.name?.[language] ?? item.name?.ru ?? item.name ?? '—'}
+                                    {typeof item.name === 'object' ? (item.name[language] ?? item.name.ru) : item.name ?? '—'}
                                     {item.size && <span className="text-gray-400"> / {item.size}</span>}
                                     {' '}×{item.quantity}
                                   </span>
@@ -315,7 +326,7 @@ export const Profile = () => {
 
                             {historyOpen && (
                               <div className="mt-2 space-y-2 pl-2">
-                                {[...history].reverse().map((entry: any, i: number) => (
+                                {[...history].reverse().map((entry, i) => (
                                   <div key={i} className="flex items-start gap-2">
                                     <div className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 bg-blue-400" />
                                     <div>
