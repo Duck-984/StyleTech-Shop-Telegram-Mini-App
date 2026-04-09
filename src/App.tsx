@@ -11,6 +11,8 @@ import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminProducts } from './pages/admin/AdminProducts';
 import { AdminOrders } from './pages/admin/AdminOrders';
+import { AdminUsers } from './pages/admin/AdminUsers';
+import { AdminRoute } from './components/AdminRoute';
 import { ToastContainer } from './components/Toast';
 
 const queryClient = new QueryClient({
@@ -27,6 +29,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          {/* Public shop routes */}
           <Route path="/" element={<Home />} />
           <Route path="/catalog" element={<Catalog />} />
           <Route path="/product/:slug" element={<ProductDetail />} />
@@ -35,10 +38,42 @@ function App() {
           <Route path="/orders" element={<Orders />} />
           <Route path="/profile" element={<Profile />} />
 
+          {/* Admin login — public */}
           <Route path="/admin" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/products" element={<AdminProducts />} />
-          <Route path="/admin/orders" element={<AdminOrders />} />
+
+          {/* Protected admin routes */}
+          <Route
+            path="/admin/dashboard"
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/products"
+            element={
+              <AdminRoute requiredRole="seller">
+                <AdminProducts />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/orders"
+            element={
+              <AdminRoute requiredRole="manager">
+                <AdminOrders />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <AdminRoute requiredRole="admin">
+                <AdminUsers />
+              </AdminRoute>
+            }
+          />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
