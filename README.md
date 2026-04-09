@@ -1,27 +1,31 @@
 # StyleTech Shop - Telegram Mini App
 
-Современный мультикатегорийный интернет-магазин в формате Telegram Mini App.
+Современный мультикатегорийный интернет-магазин в формате Telegram Mini App для рынка Узбекистана.
 
 ## Особенности
 
-- 🛍️ Мультикатегорийный каталог (одежда, аксессуары, техника)
-- 🌐 Поддержка двух языков (Русский / O'zbekcha)
-- 🛒 Корзина с поддержкой размеров и цветов
-- 📦 История заказов
-- 👤 Профиль пользователя
-- 🔐 Админ-панель с аутентификацией
-- 💳 Множество способов оплаты
-- 🚚 Доставка по Узбекистану
-- 📱 Полная интеграция с Telegram WebApp
+- Мультикатегорийный каталог (одежда, аксессуары, техника)
+- Поддержка двух языков (Русский / O'zbekcha)
+- Корзина с выбором размеров и цветов
+- История заказов со статусами и таймлайном
+- Профиль пользователя с реферальной программой
+- Промо-баннеры с каруселью
+- Доставка по Узбекистану с зональным ценообразованием
+- Множество способов оплаты: Payme, Click, Uzum Bank, Наличные
+- Полная интеграция с Telegram WebApp (хаптик, кнопки, данные пользователя)
+- Админ-панель с ролевым доступом
+- Отслеживание просмотров товаров
 
 ## Технологии
 
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
 - **State Management**: Zustand
-- **Routing**: React Router v6
-- **Backend**: Supabase (Auth, Database, Realtime)
+- **Data Fetching**: TanStack Query (React Query)
+- **Routing**: React Router v7
+- **Backend**: Supabase (PostgreSQL, Auth, Realtime, Edge Functions)
 - **Icons**: Lucide React
-- **Telegram**: Native WebApp API
+- **Telegram**: Native WebApp SDK (@tma.js/sdk-react)
+- **Deployment**: Vercel (frontend) + Supabase (backend)
 
 ## Установка
 
@@ -44,23 +48,63 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ## База данных
 
-База данных Supabase уже настроена со следующими таблицами:
-- `categories` - категории товаров
-- `products` - товары
-- `users` - пользователи Telegram
-- `orders` - заказы
+База данных Supabase содержит следующие таблицы:
 
-Тестовые данные уже добавлены в базу данных.
+- `categories` - категории товаров
+- `products` - товары с вариантами (размеры, цвета), спецификациями и счётчиком просмотров
+- `users` - пользователи Telegram
+- `orders` - заказы с историей статусов
+- `banners` - рекламные баннеры
+- `delivery_zones` - зоны доставки с ценами и сроками
+- `referrals` - реферальные коды и бонусы
+- `reviews` - отзывы на товары
+- `promotions` - акции и скидки
+
+Все таблицы защищены через Row Level Security (RLS).
+
+## Оплата (Edge Functions)
+
+Обработка платежей реализована через Supabase Edge Functions:
+
+- `create-payment` - создаёт платёжную ссылку (Payme / Click / Uzum Bank)
+- `payme-callback` - обрабатывает webhook-уведомления от Payme
+
+Необходимые секреты для Edge Functions:
+```
+PAYME_MERCHANT_ID
+PAYME_BASE_URL
+CLICK_MERCHANT_ID
+CLICK_SERVICE_ID
+CLICK_SECRET_KEY
+UZUM_MERCHANT_ID
+UZUM_API_KEY
+UZUM_BASE_URL
+```
 
 ## Админ-панель
 
-Доступ к админ-панели: `/admin`
+Доступ: `/admin`
 
-Дефолтные учетные данные:
+Учётные данные по умолчанию:
 - Email: `admin@shop.uz`
 - Пароль: `Admin123`
 
-**Важно**: Перед первым использованием создайте админ-пользователя в Supabase Auth с указанными выше credentials.
+### Роли
+
+| Роль      | Пользователи | Заказы | Товары | Баннеры | Доставка |
+|-----------|:---:|:---:|:---:|:---:|:---:|
+| admin     | +   | +   | +   | +   | +   |
+| manager   | -   | +   | -   | +   | +   |
+| seller    | -   | -   | +   | -   | -   |
+
+### Возможности
+
+- **Дашборд**: KPI-карточки, график продаж за 7 дней, топ-5 товаров, последние заказы
+- **Товары**: CRUD, управление остатками (инкремент/декремент), активация/деактивация
+- **Заказы**: смена статусов (новый → обработка → сборка → доставка → доставлен), история статусов
+- **Пользователи**: список и назначение ролей
+- **Баннеры**: CRUD с поддержкой мультиязычности
+- **Доставка**: зоны, цены (стандарт/экспресс), порог бесплатной доставки
 
 ## Запуск
 
@@ -74,47 +118,53 @@ npm run dev
 npm run build
 ```
 
-Предпросмотр сборки:
+Проверка типов:
 ```bash
-npm run preview
+npm run typecheck
 ```
 
 ## Структура проекта
 
 ```
 src/
-├── components/          # Компоненты (Layout, Header, ProductCard и т.д.)
-├── pages/              # Страницы приложения
-│   ├── admin/          # Админ-панель
-│   ├── Home.tsx        # Выбор языка
-│   ├── Catalog.tsx     # Каталог товаров
+├── components/          # Layout, Header, BottomNav, ProductCard, BannerSlider, Toast
+├── pages/
+│   ├── admin/           # AdminDashboard, AdminProducts, AdminOrders, AdminUsers, AdminBanners, AdminDelivery
+│   ├── Home.tsx         # Выбор языка + регистрация пользователя
+│   ├── Catalog.tsx      # Каталог с поиском и фильтрами
 │   ├── ProductDetail.tsx
 │   ├── Cart.tsx
 │   ├── Checkout.tsx
 │   ├── Orders.tsx
 │   └── Profile.tsx
-├── store/              # Zustand stores
-├── lib/                # Утилиты и конфигурация
-│   ├── supabase.ts     # Supabase клиент
-│   ├── telegram.ts     # Telegram WebApp API
-│   ├── utils.ts        # Вспомогательные функции
-│   └── translations.ts # Переводы
-└── hooks/              # React hooks
+├── store/               # useAppStore (язык, Telegram user ID), useCartStore
+├── lib/
+│   ├── supabase/        # Supabase клиент, хуки, запросы
+│   ├── telegram.ts      # Telegram WebApp API
+│   ├── auth.ts          # Аутентификация и роли
+│   ├── utils.ts         # Вспомогательные функции
+│   └── translations.ts  # Переводы (ru/uz)
+└── hooks/               # useTranslation
+supabase/
+├── functions/           # Edge Functions (create-payment, payme-callback)
+└── migrations/          # SQL-миграции
+```
 
 ## Telegram Mini App
 
-Для тестирования в Telegram:
 1. Создайте бота через @BotFather
-2. Настройте Web App URL через @BotFather
-3. Запустите приложение и откройте через бота
+2. Добавьте Web App через команду `/newapp` или `/setmenubutton`
+3. Укажите URL задеплоенного приложения
+4. Откройте через бота для тестирования
 
 ## Деплой
 
-Рекомендуется деплой на Vercel:
+Подробные инструкции — в файле `DEPLOYMENT.md`.
 
+Быстрый старт на Vercel:
 1. Подключите репозиторий к Vercel
-2. Добавьте переменные окружения из `.env`
-3. Деплой произойдет автоматически
+2. Добавьте переменные окружения (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
+3. Деплой произойдёт автоматически при пуше в `main`
 
 ## Лицензия
 
