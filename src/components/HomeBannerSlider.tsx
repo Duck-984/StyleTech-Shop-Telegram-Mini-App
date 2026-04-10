@@ -1,26 +1,30 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Banner } from '../lib/supabase/queries';
 
 interface Props {
   banners: Banner[];
   language: 'ru' | 'uz';
-  onNavigate: () => void;
+  onNavigate: (url?: string) => void;
 }
 
 const AUTOPLAY_DELAY = 5000;
 
 export const HomeBannerSlider = ({ banners, language, onNavigate }: Props) => {
   const [current, setCurrent] = useState(0);
+  const [animating, setAnimating] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
   const goTo = useCallback(
     (index: number) => {
+      if (animating) return;
+      setAnimating(true);
       setCurrent(((index % banners.length) + banners.length) % banners.length);
+      setTimeout(() => setAnimating(false), 600);
     },
-    [banners.length],
+    [banners.length, animating],
   );
 
   const startTimer = useCallback(() => {
@@ -57,10 +61,10 @@ export const HomeBannerSlider = ({ banners, language, onNavigate }: Props) => {
 
   if (!banners.length) return null;
 
-  const banner = banners[current];
-
-  const handleCta = () => {
-    if (banner.link_url) {
+  const handleCta = (b: Banner) => {
+    if (b.link_url) {
+      onNavigate(b.link_url);
+    } else {
       onNavigate();
     }
   };
@@ -71,12 +75,14 @@ export const HomeBannerSlider = ({ banners, language, onNavigate }: Props) => {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="relative h-44 sm:h-52">
+      <div className="relative h-52 sm:h-64">
         {banners.map((b, i) => (
           <div
             key={b.id}
-            className={`absolute inset-0 transition-opacity duration-700 ${
-              i === current ? 'opacity-100 z-10' : 'opacity-0 z-0'
+            className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+              i === current
+                ? 'opacity-100 z-10 scale-100'
+                : 'opacity-0 z-0 scale-[1.02]'
             }`}
           >
             <div className={`absolute inset-0 bg-gradient-to-br ${b.bg_color}`} />
@@ -90,49 +96,64 @@ export const HomeBannerSlider = ({ banners, language, onNavigate }: Props) => {
               />
             )}
 
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
 
-            <div className="absolute inset-0 flex flex-col justify-end px-5 pb-5">
+            <div className="absolute inset-0 flex flex-col justify-end px-5 pb-6">
               {b.subtitle && (b.subtitle.ru || b.subtitle.uz) && (
-                <p className="text-white/75 text-xs font-medium uppercase tracking-widest mb-1.5 drop-shadow-sm">
+                <p className="text-white/70 text-xs font-semibold uppercase tracking-[0.15em] mb-2 drop-shadow-sm">
                   {b.subtitle[language] || b.subtitle.ru}
                 </p>
               )}
               <p
-                className="text-white font-bold text-xl leading-tight drop-shadow-md max-w-[75%]"
-                style={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
+                className="text-white font-bold text-xl sm:text-2xl leading-tight drop-shadow-md max-w-[78%]"
+                style={{ textShadow: '0 2px 12px rgba(0,0,0,0.5)' }}
               >
                 {b.title[language] || b.title.ru}
               </p>
-              {(b.link_url || b.link_label) && (
-                <button
-                  onClick={handleCta}
-                  className="mt-3 self-start flex items-center gap-1.5 px-4 py-1.5 bg-white text-gray-900 rounded-full text-xs font-bold hover:bg-white/90 active:scale-95 transition-all shadow-lg"
-                >
-                  {b.link_label ? (b.link_label[language] || b.link_label.ru) : (language === 'ru' ? 'Смотреть' : "Ko'rish")}
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              )}
+              <button
+                onClick={() => handleCta(b)}
+                className="mt-4 self-start flex items-center gap-1.5 px-4 py-2 bg-white text-gray-900 rounded-full text-xs font-bold hover:bg-white/90 active:scale-95 transition-all shadow-lg"
+              >
+                {b.link_label
+                  ? (b.link_label[language] || b.link_label.ru)
+                  : (language === 'ru' ? 'Смотреть каталог' : "Katalogni ko'rish")}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         ))}
       </div>
 
       {banners.length > 1 && (
-        <div className="absolute bottom-3 right-4 z-20 flex gap-1.5">
-          {banners.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => { goTo(i); startTimer(); }}
-              className={`rounded-full transition-all duration-300 ${
-                i === current
-                  ? 'w-6 h-2 bg-white'
-                  : 'w-2 h-2 bg-white/45 hover:bg-white/65'
-              }`}
-            />
-          ))}
-        </div>
+        <>
+          <button
+            onClick={() => { goTo(current - 1); startTimer(); }}
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/25 hover:bg-black/45 backdrop-blur-sm flex items-center justify-center transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4 text-white" />
+          </button>
+          <button
+            onClick={() => { goTo(current + 1); startTimer(); }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/25 hover:bg-black/45 backdrop-blur-sm flex items-center justify-center transition-colors"
+          >
+            <ChevronRight className="w-4 h-4 text-white" />
+          </button>
+
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+            {banners.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => { goTo(i); startTimer(); }}
+                className={`rounded-full transition-all duration-300 ${
+                  i === current
+                    ? 'w-6 h-2 bg-white'
+                    : 'w-2 h-2 bg-white/45 hover:bg-white/65'
+                }`}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

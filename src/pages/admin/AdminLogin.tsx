@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { loginAdmin } from '../../lib/auth';
+import { loginAdmin, ROLE_LABELS } from '../../lib/auth';
+import { toast } from '../../components/Toast';
 
 export const AdminLogin = () => {
   const navigate = useNavigate();
@@ -26,15 +27,23 @@ export const AdminLogin = () => {
 
     setLoading(true);
 
-    const user = await loginAdmin(email, password);
-    setLoading(false);
+    try {
+      const user = await loginAdmin(email, password);
 
-    if (!user) {
-      setError('Неверный email или пароль. Проверьте учётные данные и попробуйте снова.');
-      return;
+      if (!user) {
+        setError('Неверный email или пароль. Проверьте учётные данные и попробуйте снова.');
+        toast.error('Неверный email или пароль');
+        return;
+      }
+
+      toast.success(`Добро пожаловать, ${user.first_name}! (${ROLE_LABELS[user.role]})`);
+      navigate('/admin/dashboard');
+    } catch {
+      setError('Ошибка подключения. Проверьте интернет и попробуйте снова.');
+      toast.error('Ошибка подключения к серверу');
+    } finally {
+      setLoading(false);
     }
-
-    navigate('/admin/dashboard');
   };
 
   return (
@@ -91,10 +100,7 @@ export const AdminLogin = () => {
                     tabIndex={-1}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:cursor-not-allowed transition-colors"
                   >
-                    {showPassword
-                      ? <EyeOff className="w-5 h-5" />
-                      : <Eye className="w-5 h-5" />
-                    }
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
@@ -117,8 +123,30 @@ export const AdminLogin = () => {
                 {loading ? 'Выполняется вход...' : 'Войти'}
               </button>
             </form>
-          </div>
 
+            <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-xs text-gray-400 dark:text-gray-500 text-center mb-3 font-medium">
+                Тестовые аккаунты
+              </p>
+              <div className="space-y-2">
+                {[
+                  { email: 'admin@shop.uz', role: 'Администратор', pass: 'Admin123' },
+                  { email: 'manager@shop.uz', role: 'Менеджер', pass: 'Manager123' },
+                  { email: 'seller@shop.uz', role: 'Продавец', pass: 'Seller123' },
+                ].map((acc) => (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    onClick={() => { setEmail(acc.email); setPassword(acc.pass); setError(''); }}
+                    className="w-full flex items-center justify-between text-xs px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
+                  >
+                    <span className="font-mono">{acc.email}</span>
+                    <span className="text-gray-400 dark:text-gray-500">{acc.role}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

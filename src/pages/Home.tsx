@@ -39,7 +39,11 @@ export const Home = () => {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
       {banners.length > 0 && (
         <div className="flex-shrink-0">
-          <HomeBannerSlider banners={banners} language={language} onNavigate={() => navigate('/catalog')} />
+          <HomeBannerSlider
+            banners={banners}
+            language={language}
+            onNavigate={(url) => navigate(url && url.startsWith('/') ? url : '/catalog')}
+          />
         </div>
       )}
 
