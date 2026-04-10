@@ -2,15 +2,21 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Package, ShoppingBag, DollarSign, LogOut, Users, TrendingUp,
-  Image, BarChart2, ArrowUpRight, ShoppingCart, Truck,
+  Image, BarChart2, ArrowUpRight, ShoppingCart, Truck, Calendar,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { getCurrentAdmin, logoutAdmin, canManageUsers, canManageOrders, canManageBanners, canManageDelivery, ROLE_LABELS } from '../../lib/auth';
+import {
+  getCurrentAdmin, logoutAdmin,
+  canManageUsers, canManageOrders, canManageBanners, canManageDelivery,
+  ROLE_LABELS,
+} from '../../lib/auth';
 import { formatPrice } from '../../lib/utils';
 import { getStatusInfo } from '../../lib/orderStatuses';
 
 interface SalesDay { date: string; revenue: number; orders: number }
 interface TopProduct { name: string; orders: number; revenue: number }
+
+type Period = '7d' | '30d' | 'all';
 
 interface DashStats {
   totalOrders: number;
@@ -23,6 +29,7 @@ interface DashStats {
   ordersByStatus: Record<string, number>;
   avgOrderValue: number;
   activeBanners: number;
+  newUsersCount: number;
 }
 
 const EMPTY_STATS: DashStats = {
@@ -36,6 +43,7 @@ const EMPTY_STATS: DashStats = {
   ordersByStatus: {},
   avgOrderValue: 0,
   activeBanners: 0,
+  newUsersCount: 0,
 };
 
 const STATUS_BAR_COLORS: Record<string, string> = {
@@ -52,32 +60,60 @@ const STATUS_BAR_COLORS: Record<string, string> = {
   shipped: 'bg-blue-400',
 };
 
+const PERIOD_LABELS: Record<Period, string> = {
+  '7d': '7 дней',
+  '30d': '30 дней',
+  'all': 'Всё время',
+};
+
 export const AdminDashboard = () => {
   const navigate = useNavigate();
   const admin = getCurrentAdmin();
   const [stats, setStats] = useState<DashStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<Period>('7d');
 
-  useEffect(() => { loadStats(); }, []);
+  useEffect(() => { loadStats(); }, [period]);
 
   const loadStats = async () => {
+    setLoading(true);
     try {
-      const [ordersRes, productsRes, recentRes, bannersRes] = await Promise.all([
-        supabase.from('orders').select('total_amount, status, created_at, items', { count: 'exact' }),
+      const now = new Date();
+      let dateFrom: string | null = null;
+
+      if (period === '7d') {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 6);
+        dateFrom = d.toISOString().slice(0, 10);
+      } else if (period === '30d') {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 29);
+        dateFrom = d.toISOString().slice(0, 10);
+      }
+
+      let ordersQuery = supabase
+        .from('orders')
+        .select('total_amount, status, created_at, items', { count: 'exact' });
+      if (dateFrom) {
+        ordersQuery = ordersQuery.gte('created_at', dateFrom + 'T00:00:00');
+      }
+
+      const [ordersRes, productsRes, recentRes, bannersRes, usersRes] = await Promise.all([
+        ordersQuery,
         supabase.from('products').select('id', { count: 'exact' }),
         supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(6),
         supabase.from('banners').select('id', { count: 'exact' }).eq('is_active', true),
+        supabase.from('users').select('id', { count: 'exact' }),
       ]);
 
       const allOrders = ordersRes.data ?? [];
       const totalRevenue = allOrders.reduce((s, o) => s + Number(o.total_amount), 0);
       const avgOrderValue = allOrders.length ? totalRevenue / allOrders.length : 0;
 
-      // Sales by last 7 days
-      const now = new Date();
-      const salesByDay: SalesDay[] = Array.from({ length: 7 }, (_, i) => {
+      const days = period === '7d' ? 7 : period === '30d' ? 30 : 14;
+      const salesByDay: SalesDay[] = Array.from({ length: days }, (_, i) => {
         const d = new Date(now);
-        d.setDate(d.getDate() - (6 - i));
+        d.setDate(d.getDate() - (days - 1 - i));
         const dateStr = d.toISOString().slice(0, 10);
         const dayOrders = allOrders.filter(o => o.created_at.slice(0, 10) === dateStr);
         return {
@@ -87,13 +123,11 @@ export const AdminDashboard = () => {
         };
       });
 
-      // Orders by status
       const ordersByStatus: Record<string, number> = {};
       allOrders.forEach(o => {
         ordersByStatus[o.status] = (ordersByStatus[o.status] ?? 0) + 1;
       });
 
-      // Top products from items
       const productMap: Record<string, { name: string; orders: number; revenue: number }> = {};
       allOrders.forEach(order => {
         const items = order.items as any[];
@@ -115,13 +149,14 @@ export const AdminDashboard = () => {
         totalOrders: ordersRes.count ?? 0,
         totalRevenue,
         totalProducts: productsRes.count ?? 0,
-        totalUsers: 0,
+        totalUsers: usersRes.count ?? 0,
         recentOrders: recentRes.data ?? [],
         salesByDay,
         topProducts,
         ordersByStatus,
         avgOrderValue,
         activeBanners: bannersRes.count ?? 0,
+        newUsersCount: usersRes.count ?? 0,
       });
     } finally {
       setLoading(false);
@@ -134,9 +169,14 @@ export const AdminDashboard = () => {
 
   const maxDayRevenue = Math.max(...stats.salesByDay.map(d => d.revenue), 1);
 
+  const periodDays = period === '7d' ? 7 : period === '30d' ? 30 : null;
+  const dateFormat = period === '30d'
+    ? { day: 'numeric' as const, month: 'short' as const }
+    : { day: 'numeric' as const, month: 'short' as const };
+  const showEvery = period === '30d' ? 4 : 1;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
       <header className="sticky top-0 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -175,21 +215,40 @@ export const AdminDashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        {/* KPI Cards */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Обзор</h2>
+          <div className="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-1 shadow-sm">
+            <Calendar className="w-4 h-4 text-gray-400 ml-2" />
+            {(['7d', '30d', 'all'] as Period[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  period === p
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                {PERIOD_LABELS[p]}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
-            label="Всего заказов"
+            label="Заказов"
             value={loading ? null : stats.totalOrders}
             icon={<ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
             iconBg="bg-blue-50 dark:bg-blue-900/20"
-            sub="за всё время"
+            sub={period === 'all' ? 'за всё время' : `за ${PERIOD_LABELS[period]}`}
           />
           <KpiCard
             label="Выручка"
             value={loading ? null : formatPrice(stats.totalRevenue)}
             icon={<TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />}
             iconBg="bg-green-50 dark:bg-green-900/20"
-            sub="всего"
+            sub={period === 'all' ? 'за всё время' : `за ${PERIOD_LABELS[period]}`}
           />
           <KpiCard
             label="Средний чек"
@@ -199,21 +258,38 @@ export const AdminDashboard = () => {
             sub="на заказ"
           />
           <KpiCard
-            label="Товары"
-            value={loading ? null : stats.totalProducts}
-            icon={<Package className="w-5 h-5 text-sky-600 dark:text-sky-400" />}
+            label="Покупатели"
+            value={loading ? null : stats.totalUsers}
+            icon={<Users className="w-5 h-5 text-sky-600 dark:text-sky-400" />}
             iconBg="bg-sky-50 dark:bg-sky-900/20"
-            sub="в каталоге"
+            sub="всего"
           />
         </div>
 
-        {/* Sales Chart + Status Breakdown */}
+        <div className="grid grid-cols-2 lg:grid-cols-2 gap-4">
+          <KpiCard
+            label="Товары"
+            value={loading ? null : stats.totalProducts}
+            icon={<Package className="w-5 h-5 text-slate-600 dark:text-slate-400" />}
+            iconBg="bg-slate-50 dark:bg-slate-900/20"
+            sub="в каталоге"
+          />
+          <KpiCard
+            label="Активные баннеры"
+            value={loading ? null : stats.activeBanners}
+            icon={<Image className="w-5 h-5 text-rose-600 dark:text-rose-400" />}
+            iconBg="bg-rose-50 dark:bg-rose-900/20"
+            sub="показываются"
+          />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sales Chart */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h2 className="font-bold text-gray-900 dark:text-white">Продажи за 7 дней</h2>
+                <h2 className="font-bold text-gray-900 dark:text-white">
+                  Продажи {period !== 'all' ? `за ${PERIOD_LABELS[period]}` : '(последние 14 дней)'}
+                </h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Выручка по дням</p>
               </div>
               <BarChart2 className="w-5 h-5 text-gray-400 dark:text-gray-500" />
@@ -223,22 +299,25 @@ export const AdminDashboard = () => {
                 <span className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
-              <div className="flex items-end gap-2 h-36">
-                {stats.salesByDay.map((day) => {
+              <div className="flex items-end gap-1 h-36">
+                {stats.salesByDay.map((day, idx) => {
                   const pct = maxDayRevenue > 0 ? (day.revenue / maxDayRevenue) * 100 : 0;
-                  const label = new Date(day.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                  const showLabel = showEvery === 1 || idx % showEvery === 0;
+                  const label = new Date(day.date).toLocaleDateString('ru-RU', dateFormat);
                   return (
                     <div key={day.date} className="flex-1 flex flex-col items-center gap-1 group relative">
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                        {formatPrice(day.revenue)}<br />{day.orders} заказов
+                        {formatPrice(day.revenue)} · {day.orders} заказ.
                       </div>
                       <div className="w-full flex items-end" style={{ height: '100px' }}>
                         <div
-                          className="w-full rounded-t-lg bg-blue-500 hover:bg-blue-600 transition-all duration-300"
-                          style={{ height: `${Math.max(pct, pct > 0 ? 4 : 0)}%` }}
+                          className={`w-full rounded-t-lg transition-all duration-300 ${day.revenue > 0 ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-100 dark:bg-gray-700'}`}
+                          style={{ height: `${Math.max(pct, pct > 0 ? 4 : 2)}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap leading-tight">{label}</span>
+                      {showLabel && (
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500 whitespace-nowrap leading-tight">{label}</span>
+                      )}
                     </div>
                   );
                 })}
@@ -246,7 +325,6 @@ export const AdminDashboard = () => {
             )}
           </div>
 
-          {/* Order Status Breakdown */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
             <h2 className="font-bold text-gray-900 dark:text-white mb-1">Статусы заказов</h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">Распределение</p>
@@ -258,32 +336,32 @@ export const AdminDashboard = () => {
               <p className="text-sm text-gray-400 text-center py-8">Заказов нет</p>
             ) : (
               <div className="space-y-3">
-                {Object.entries(stats.ordersByStatus).map(([status, count]) => {
-                  const total = stats.totalOrders || 1;
-                  const pct = Math.round((count / total) * 100);
-                  return (
-                    <div key={status}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-600 dark:text-gray-400">{getStatusInfo(status).label_ru}</span>
-                        <span className="text-xs font-semibold text-gray-900 dark:text-white">{count} ({pct}%)</span>
+                {Object.entries(stats.ordersByStatus)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([status, count]) => {
+                    const total = stats.totalOrders || 1;
+                    const pct = Math.round((count / total) * 100);
+                    return (
+                      <div key={status}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-600 dark:text-gray-400">{getStatusInfo(status).label_ru}</span>
+                          <span className="text-xs font-semibold text-gray-900 dark:text-white">{count} ({pct}%)</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${STATUS_BAR_COLORS[status] ?? 'bg-gray-400'} transition-all duration-700`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${STATUS_BAR_COLORS[status] ?? 'bg-gray-400'} transition-all duration-700`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             )}
           </div>
         </div>
 
-        {/* Bottom row: Nav cards + Top Products + Recent Orders */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Quick Nav */}
           <div className="flex flex-col gap-3">
             <NavCard to="/admin/products" color="blue" icon={<ShoppingBag className="w-5 h-5" />} label="Товары" sub="Добавить, редактировать" />
             {canManageOrders(admin) && (
@@ -300,11 +378,10 @@ export const AdminDashboard = () => {
             )}
           </div>
 
-          {/* Top Products */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
               <h2 className="font-bold text-gray-900 dark:text-white text-sm">Топ товаров</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">По выручке</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">По выручке · {PERIOD_LABELS[period]}</p>
             </div>
             {loading ? (
               <div className="flex items-center justify-center py-10">
@@ -332,7 +409,7 @@ export const AdminDashboard = () => {
                       <p className="text-xs font-bold text-gray-900 dark:text-white whitespace-nowrap">{formatPrice(p.revenue)}</p>
                       <p className="flex items-center justify-end gap-0.5 text-[10px] text-green-600 dark:text-green-400">
                         <ArrowUpRight className="w-2.5 h-2.5" />
-                        <span>+</span>
+                        <span>выручка</span>
                       </p>
                     </div>
                   </div>
@@ -341,7 +418,6 @@ export const AdminDashboard = () => {
             )}
           </div>
 
-          {/* Recent Orders */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
               <div>

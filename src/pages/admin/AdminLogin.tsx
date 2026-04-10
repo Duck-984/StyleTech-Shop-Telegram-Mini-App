@@ -25,9 +25,8 @@ export const AdminLogin = () => {
     }
 
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
 
-    const user = loginAdmin(email, password);
+    const user = await loginAdmin(email, password);
     setLoading(false);
 
     if (!user) {

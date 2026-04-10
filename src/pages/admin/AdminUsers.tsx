@@ -1,44 +1,90 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Plus, CreditCard as Edit2, Trash2, X, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, X, AlertCircle, Shield, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getCurrentAdmin, AdminRole, ROLE_LABELS } from '../../lib/auth';
 
-interface DbUser {
+interface AdminAccount {
+  id: string;
+  email: string;
+  first_name: string;
+  role: AdminRole;
+  is_active: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+interface TelegramUser {
   id: string;
   telegram_id: number;
   first_name: string;
   username: string | null;
-  role: string;
+  language: string;
   created_at: string;
 }
 
 const ROLES: AdminRole[] = ['admin', 'manager', 'seller'];
 
+const roleCls: Record<string, string> = {
+  admin: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+  manager: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+  seller: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
+};
+
+const roleDescriptions: Record<AdminRole, string> = {
+  admin: 'Полный доступ ко всем разделам панели управления',
+  manager: 'Доступ к товарам, заказам, баннерам, доставке и аналитике',
+  seller: 'Доступ только к управлению товарами и складом',
+};
+
 export const AdminUsers = () => {
   const admin = getCurrentAdmin();
-  const [users, setUsers] = useState<DbUser[]>([]);
+  const [tab, setTab] = useState<'admins' | 'telegram'>('admins');
+
+  const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
+  const [telegramUsers, setTelegramUsers] = useState<TelegramUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<DbUser | null>(null);
-  const [form, setForm] = useState({ first_name: '', username: '', role: 'seller' as AdminRole });
+  const [editing, setEditing] = useState<AdminAccount | null>(null);
+  const [form, setForm] = useState({
+    email: '',
+    password_plain: '',
+    first_name: '',
+    role: 'seller' as AdminRole,
+    is_active: true,
+  });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => {
+    loadData();
+  }, [tab]);
 
-  const loadUsers = async () => {
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
     try {
-      setLoading(true);
-      const { data, error: err } = await supabase
-        .from('users').select('*').order('created_at', { ascending: false });
-      if (err) throw err;
-      setUsers(data ?? []);
+      if (tab === 'admins') {
+        const { data, error: err } = await supabase
+          .from('admin_accounts')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (err) throw err;
+        setAdminAccounts(data ?? []);
+      } else {
+        const { data, error: err } = await supabase
+          .from('users')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (err) throw err;
+        setTelegramUsers(data ?? []);
+      }
     } catch {
-      setError('Не удалось загрузить пользователей.');
+      setError('Не удалось загрузить данные.');
     } finally {
       setLoading(false);
     }
@@ -46,74 +92,97 @@ export const AdminUsers = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ first_name: '', username: '', role: 'seller' });
+    setForm({ email: '', password_plain: '', first_name: '', role: 'seller', is_active: true });
     setFormError('');
     setShowForm(true);
   };
 
-  const openEdit = (u: DbUser) => {
+  const openEdit = (u: AdminAccount) => {
     setEditing(u);
-    setForm({ first_name: u.first_name, username: u.username ?? '', role: (u.role as AdminRole) });
+    setForm({
+      email: u.email,
+      password_plain: '',
+      first_name: u.first_name,
+      role: u.role,
+      is_active: u.is_active,
+    });
     setFormError('');
     setShowForm(true);
   };
 
-  const closeForm = () => { setShowForm(false); setEditing(null); };
+  const closeForm = () => {
+    setShowForm(false);
+    setEditing(null);
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+
     if (!form.first_name.trim()) { setFormError('Введите имя'); return; }
+    if (!form.email.trim()) { setFormError('Введите email'); return; }
+    if (!editing && !form.password_plain) { setFormError('Введите пароль'); return; }
 
     setSaving(true);
     try {
       if (editing) {
-        const { error: err } = await supabase.from('users').update({
+        const updates: Record<string, unknown> = {
           first_name: form.first_name.trim(),
-          username: form.username.trim() || null,
           role: form.role,
-        }).eq('id', editing.id);
+          is_active: form.is_active,
+        };
+        if (form.password_plain) {
+          updates.password_plain = form.password_plain;
+        }
+        const { error: err } = await supabase
+          .from('admin_accounts')
+          .update(updates)
+          .eq('id', editing.id);
         if (err) throw err;
-        setSuccess('Пользователь обновлён');
+        setSuccess('Сотрудник обновлён');
       } else {
-        const fakeId = Date.now();
-        const { error: err } = await supabase.from('users').insert({
-          telegram_id: fakeId,
+        const { error: err } = await supabase.from('admin_accounts').insert({
+          email: form.email.trim().toLowerCase(),
+          password_plain: form.password_plain,
           first_name: form.first_name.trim(),
-          username: form.username.trim() || null,
           role: form.role,
-          language: 'ru',
+          is_active: form.is_active,
         });
         if (err) throw err;
-        setSuccess('Пользователь создан');
+        setSuccess('Сотрудник добавлен');
       }
       closeForm();
-      await loadUsers();
+      await loadData();
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err: any) {
-      setFormError(err.message ?? 'Ошибка при сохранении');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Ошибка при сохранении';
+      setFormError(msg.includes('duplicate') ? 'Этот email уже используется' : msg);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Удалить пользователя? Действие необратимо.')) return;
-    const { error: err } = await supabase.from('users').delete().eq('id', id);
+    if (!confirm('Удалить сотрудника? Действие необратимо.')) return;
+    const { error: err } = await supabase.from('admin_accounts').delete().eq('id', id);
     if (err) { setError('Ошибка при удалении.'); return; }
-    setUsers((prev) => prev.filter((u) => u.id !== id));
-    setSuccess('Пользователь удалён');
+    setAdminAccounts((prev) => prev.filter((u) => u.id !== id));
+    setSuccess('Сотрудник удалён');
     setTimeout(() => setSuccess(''), 3000);
   };
 
-  if (!admin) return null;
-
-  const roleCls: Record<string, string> = {
-    admin:   'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-    manager: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-    seller:  'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
-    user:    'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
+  const toggleActive = async (account: AdminAccount) => {
+    const { error: err } = await supabase
+      .from('admin_accounts')
+      .update({ is_active: !account.is_active })
+      .eq('id', account.id);
+    if (err) { setError('Ошибка обновления статуса'); return; }
+    setAdminAccounts((prev) =>
+      prev.map((u) => u.id === account.id ? { ...u, is_active: !u.is_active } : u)
+    );
   };
+
+  if (!admin) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -128,13 +197,15 @@ export const AdminUsers = () => {
             </Link>
             <h1 className="text-lg font-bold text-gray-900 dark:text-white">Пользователи</h1>
           </div>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Добавить</span>
-          </button>
+          {tab === 'admins' && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Добавить</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -143,7 +214,7 @@ export const AdminUsers = () => {
           <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-2xl border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                {editing ? 'Редактировать пользователя' : 'Новый пользователь'}
+                {editing ? 'Редактировать сотрудника' : 'Новый сотрудник'}
               </h2>
               <button
                 onClick={closeForm}
@@ -169,14 +240,28 @@ export const AdminUsers = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                  Username
+                  Email
                 </label>
                 <input
-                  type="text"
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  type="email"
+                  value={form.email}
+                  disabled={!!editing}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm disabled:opacity-60"
+                  placeholder="manager@shop.uz"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  {editing ? 'Новый пароль (оставьте пустым чтобы не менять)' : 'Пароль'}
+                </label>
+                <input
+                  type="password"
+                  value={form.password_plain}
+                  onChange={(e) => setForm({ ...form, password_plain: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                  placeholder="ivan_petrov"
+                  placeholder="••••••••"
                 />
               </div>
 
@@ -194,10 +279,21 @@ export const AdminUsers = () => {
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-                  {form.role === 'admin' && 'Полный доступ ко всем разделам'}
-                  {form.role === 'manager' && 'Доступ: товары, заказы, аналитика'}
-                  {form.role === 'seller' && 'Доступ: только управление товарами'}
+                  {roleDescriptions[form.role]}
                 </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, is_active: !form.is_active })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.is_active ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  {form.is_active ? 'Активен' : 'Заблокирован'}
+                </span>
               </div>
 
               {formError && (
@@ -241,66 +337,139 @@ export const AdminUsers = () => {
           </div>
         )}
 
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setTab('admins')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${tab === 'admins' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+          >
+            <Shield className="w-4 h-4" />
+            Сотрудники панели
+          </button>
+          <button
+            onClick={() => setTab('telegram')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${tab === 'telegram' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+          >
+            <Users className="w-4 h-4" />
+            Покупатели
+          </button>
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <span className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : users.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 dark:text-gray-500 text-sm">
-            Нет пользователей
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Имя</th>
-                  <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Username</th>
-                  <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Роль</th>
-                  <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Добавлен</th>
-                  <th className="text-right px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Действия</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
-                    <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                      {u.first_name}
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                      {u.username ? `@${u.username}` : '—'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleCls[u.role] ?? roleCls.user}`}>
-                        {ROLE_LABELS[u.role as AdminRole] ?? u.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">
-                      {new Date(u.created_at).toLocaleDateString('ru-RU')}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEdit(u)}
-                          className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition"
-                          title="Редактировать"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(u.id)}
-                          className="p-2 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
-                          title="Удалить"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+        ) : tab === 'admins' ? (
+          adminAccounts.length === 0 ? (
+            <div className="text-center py-20 text-gray-400 dark:text-gray-500 text-sm">
+              Нет сотрудников
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Имя</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Email</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Роль</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300 hidden sm:table-cell">Последний вход</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Статус</th>
+                    <th className="text-right px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Действия</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {adminAccounts.map((u) => (
+                    <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
+                      <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
+                        {u.first_name}
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">
+                        {u.email}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleCls[u.role] ?? roleCls.seller}`}>
+                          {ROLE_LABELS[u.role]}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs hidden sm:table-cell">
+                        {u.last_login_at
+                          ? new Date(u.last_login_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                          : '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => toggleActive(u)}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full transition ${u.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        >
+                          {u.is_active ? 'Активен' : 'Заблокирован'}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => openEdit(u)}
+                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition"
+                            title="Редактировать"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(u.id)}
+                            className="p-2 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                            title="Удалить"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          telegramUsers.length === 0 ? (
+            <div className="text-center py-20 text-gray-400 dark:text-gray-500 text-sm">
+              Нет покупателей
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Имя</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Username</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Telegram ID</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Язык</th>
+                    <th className="text-left px-6 py-3 font-semibold text-gray-700 dark:text-gray-300">Добавлен</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {telegramUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition">
+                      <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
+                        {u.first_name}
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
+                        {u.username ? `@${u.username}` : '—'}
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 dark:text-gray-400 font-mono text-xs">
+                        {u.telegram_id}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-xs font-medium px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full uppercase">
+                          {u.language}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">
+                        {new Date(u.created_at).toLocaleDateString('ru-RU')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         )}
       </main>
     </div>

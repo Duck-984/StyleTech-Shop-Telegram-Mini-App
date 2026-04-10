@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 export type AdminRole = 'admin' | 'manager' | 'seller';
 
 export interface AdminUser {
@@ -9,21 +11,49 @@ export interface AdminUser {
 
 const STORAGE_KEY = 'styletech_admin';
 
-export function loginAdmin(email: string, password: string): AdminUser | null {
-  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+export async function loginAdmin(email: string, password: string): Promise<AdminUser | null> {
+  const emailLower = email.trim().toLowerCase();
 
-  if (!adminEmail || !adminPassword) return null;
-  if (email.trim().toLowerCase() !== adminEmail.toLowerCase() || password !== adminPassword) {
+  const { data, error } = await supabase
+    .from('admin_accounts')
+    .select('id, email, first_name, role, is_active')
+    .eq('email', emailLower)
+    .eq('password_plain', password)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error || !data) {
+    const fallbackEmail = import.meta.env.VITE_ADMIN_EMAIL;
+    const fallbackPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+    if (
+      fallbackEmail &&
+      fallbackPassword &&
+      emailLower === fallbackEmail.toLowerCase() &&
+      password === fallbackPassword
+    ) {
+      const user: AdminUser = {
+        id: 'admin-001',
+        first_name: 'Администратор',
+        email: fallbackEmail,
+        role: 'admin',
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+      return user;
+    }
     return null;
   }
 
   const user: AdminUser = {
-    id: 'admin-001',
-    first_name: 'Администратор',
-    email: adminEmail,
-    role: 'admin',
+    id: data.id,
+    first_name: data.first_name,
+    email: data.email,
+    role: data.role as AdminRole,
   };
+
+  await supabase
+    .from('admin_accounts')
+    .update({ last_login_at: new Date().toISOString() })
+    .eq('id', data.id);
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
   return user;
