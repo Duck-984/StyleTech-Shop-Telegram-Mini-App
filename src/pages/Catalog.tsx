@@ -287,7 +287,7 @@ export const Catalog = () => {
             <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
               {language === 'ru' ? 'Найдено' : 'Topildi'}: {products.length}
             </div>
-            <div className="grid grid-cols-2 gap-4 pb-20">
+            <div className="grid grid-cols-3 gap-2.5 pb-20">
               {products.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}

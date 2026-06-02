@@ -15,42 +15,47 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   return (
     <Link
       to={`/product/${product.slug}`}
-      className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+      className="block bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all active:scale-[0.97]"
     >
-      <div className="aspect-square bg-gray-100 dark:bg-gray-700 relative overflow-hidden">
+      <div className="aspect-[3/4] bg-gray-100 dark:bg-gray-700 relative overflow-hidden">
         {product.images.length > 0 ? (
           <img
             src={product.images[0]}
             alt={getLocalizedValue(product.name, language)}
             className="w-full h-full object-cover"
+            loading="lazy"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400">
             No Image
           </div>
         )}
+
         {product.stock === 0 && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <span className="text-white font-semibold">{t('out_of_stock')}</span>
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <span className="text-white font-semibold text-xs px-3 py-1 bg-black/60 rounded-full">
+              {t('out_of_stock')}
+            </span>
+          </div>
+        )}
+
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent pt-8 pb-2 px-2">
+          <span className="text-white font-bold text-sm drop-shadow-sm">
+            {formatPrice(product.price)}
+          </span>
+        </div>
+
+        {product.stock > 0 && product.stock < 10 && (
+          <div className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+            {language === 'ru' ? 'Осталось' : 'Qoldi'} {product.stock}
           </div>
         )}
       </div>
 
-      <div className="p-3">
-        <h3 className="text-sm font-medium text-gray-900 dark:text-white line-clamp-2 mb-1">
+      <div className="p-2.5">
+        <h3 className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2 leading-tight">
           {getLocalizedValue(product.name, language)}
         </h3>
-
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-            {formatPrice(product.price)}
-          </span>
-          {product.stock > 0 && product.stock < 10 && (
-            <span className="text-xs text-orange-500">
-              {language === 'ru' ? 'Осталось' : 'Qoldi'}: {product.stock}
-            </span>
-          )}
-        </div>
       </div>
     </Link>
   );
