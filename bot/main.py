@@ -99,23 +99,32 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
     # Выполняем рассылку
-    result: BroadcastResult = await broadcast(context.bot, message_text)
+    result: BroadcastResult = await broadcast(context.bot, message_text, created_by=str(user.id))
 
     # Отчёт
-    report = (
-        f"✅ <b>Рассылка завершена</b>\n\n"
-        f"📊 Всего: {result.total}\n"
-        f"✓ Доставлено: {result.success}\n"
-        f"🚫 Заблокировали: {result.blocked}\n"
-        f"⚠️ Ошибки: {result.errors}"
-    )
+    if result.queued:
+        report = (
+            f"📋 <b>Рассылка поставлена в очередь</b>\n\n"
+            f"📊 Получателей: {result.total}\n"
+            f"🆔 Job ID: <code>{result.job_id}</code>\n\n"
+            f"Обработка начнётся автоматически."
+        )
+    else:
+        report = (
+            f"✅ <b>Рассылка завершена</b>\n\n"
+            f"📊 Всего: {result.total}\n"
+            f"✓ Доставлено: {result.success}\n"
+            f"🚫 Заблокировали: {result.blocked}\n"
+            f"⚠️ Ошибки: {result.errors}"
+        )
     await status_msg.edit_text(report, parse_mode="HTML")
     logger.info(
-        "Broadcast done: total=%d, success=%d, blocked=%d, errors=%d",
+        "Broadcast done: total=%d, success=%d, blocked=%d, errors=%d, queued=%s",
         result.total,
         result.success,
         result.blocked,
         result.errors,
+        result.queued,
     )
 
 
