@@ -421,11 +421,11 @@ export const ProductDetail = () => {
           )}
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 shadow-lg">
+        <div className="fixed bottom-14 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-3 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)] z-40">
           <button
             onClick={handleAddToCart}
             disabled={product.stock === 0}
-            className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold flex items-center justify-center space-x-2 hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="w-full bg-blue-500 text-white py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
           >
             <ShoppingCart className="w-5 h-5" />
             <span>{product.stock === 0 ? t('out_of_stock') : t('add_to_cart')}</span>

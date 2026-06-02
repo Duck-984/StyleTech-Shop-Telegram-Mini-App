@@ -13,17 +13,17 @@ export const Cart = () => {
   if (items.length === 0) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-12 text-center">
-          <ShoppingBag className="w-24 h-24 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+        <div className="flex flex-col items-center justify-center px-4 py-20">
+          <ShoppingBag className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
             {t('empty_cart')}
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">
             {t('continue_shopping')}
           </p>
           <button
             onClick={() => navigate('/catalog')}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors"
+            className="bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold text-sm active:scale-95 transition-transform"
           >
             {t('catalog')}
           </button>
@@ -34,19 +34,19 @@ export const Cart = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-          {t('cart')}
+      <div className="px-3 pt-3">
+        <h1 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
+          {t('cart')} <span className="text-gray-400 font-normal text-sm">({items.length})</span>
         </h1>
 
-        <div className="space-y-4 mb-24">
+        <div className="space-y-2.5 pb-36">
           {items.map((item) => (
             <div
               key={`${item.productId}-${item.size ?? ''}-${item.color?.hex ?? ''}`}
-              className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm"
+              className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm"
             >
-              <div className="flex space-x-4">
-                <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+              <div className="flex gap-3">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
                   {item.image ? (
                     <img
                       src={item.image}
@@ -54,91 +54,83 @@ export const Cart = () => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
                       No Image
                     </div>
                   )}
                 </div>
 
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
                     {getLocalizedValue(item.name, language)}
                   </h3>
 
-                  <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                    {item.size && (
-                      <p>
-                        {t('size')}: {item.size}
-                      </p>
-                    )}
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex flex-wrap gap-x-2">
+                    {item.size && <span>{t('size')}: {item.size}</span>}
                     {item.color && (
-                      <div className="flex items-center space-x-2">
-                        <span>{t('color')}:</span>
-                        <div
-                          className="w-4 h-4 rounded-full border border-gray-300"
+                      <span className="flex items-center gap-1">
+                        {t('color')}:
+                        <span
+                          className="inline-block w-3 h-3 rounded-full border border-gray-300"
                           style={{ backgroundColor: item.color.hex }}
                         />
-                        <span>{item.color.name}</span>
-                      </div>
+                      </span>
                     )}
                   </div>
 
                   <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center space-x-2">
+                    <p className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                      {formatPrice(item.price * item.quantity)}
+                    </p>
+
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => updateQuantity(item.productId, item.quantity - 1, item.size, item.color?.hex)}
                         disabled={item.quantity <= 1}
-                        className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center disabled:opacity-50"
+                        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center disabled:opacity-40 active:scale-90 transition"
                       >
-                        <Minus className="w-4 h-4" />
+                        <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="text-lg font-semibold w-8 text-center">
+                      <span className="text-sm font-semibold w-6 text-center text-gray-900 dark:text-white">
                         {item.quantity}
                       </span>
                       <button
                         onClick={() => updateQuantity(item.productId, item.quantity + 1, item.size, item.color?.hex)}
-                        className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center"
+                        className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center active:scale-90 transition"
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => removeItem(item.productId, item.size, item.color?.hex)}
+                        className="w-7 h-7 rounded-full flex items-center justify-center ml-1 text-red-400 active:text-red-600 active:scale-90 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-
-                    <button
-                      onClick={() => removeItem(item.productId, item.size, item.color?.hex)}
-                      className="text-red-500 hover:text-red-600"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
                   </div>
-
-                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400 mt-2">
-                    {formatPrice(item.price * item.quantity)}
-                  </p>
                 </div>
               </div>
             </div>
           ))}
         </div>
+      </div>
 
-        <div className="fixed bottom-20 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 shadow-lg">
-          <div className="container mx-auto">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('total')}:
-              </span>
-              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {formatPrice(getTotalPrice())}
-              </span>
-            </div>
-
-            <button
-              onClick={() => navigate('/checkout')}
-              className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition-colors"
-            >
-              {t('checkout')}
-            </button>
-          </div>
+      {/* Fixed checkout bar — positioned above BottomNav */}
+      <div className="fixed bottom-14 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-3 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)] z-40">
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+            {t('total')}:
+          </span>
+          <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+            {formatPrice(getTotalPrice())}
+          </span>
         </div>
+        <button
+          onClick={() => navigate('/checkout')}
+          className="w-full bg-blue-500 text-white py-3 rounded-xl font-semibold text-sm active:scale-[0.98] transition-transform"
+        >
+          {t('checkout')}
+        </button>
       </div>
     </Layout>
   );
