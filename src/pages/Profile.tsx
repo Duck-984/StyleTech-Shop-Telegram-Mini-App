@@ -21,9 +21,9 @@ const formatDate = (iso: string) =>
 export const Profile = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
-  const { telegramUserId } = useAppStore();
+  const { telegramUserId, getUserId, registeredName, registeredPhone } = useAppStore();
   const user = getTelegramUser();
-  const userId = telegramUserId ?? user?.id ?? 0;
+  const userId = user?.id || getUserId();
 
   const { data: orders = [], isLoading: ordersLoading } = useOrders(userId);
   const { data: referrals = [] } = useUserReferrals(userId);
@@ -37,9 +37,9 @@ export const Profile = () => {
   const [saving, setSaving] = useState(false);
 
   const [profileData, setProfileData] = useState({
-    name: user?.first_name ?? '',
+    name: user?.first_name ?? registeredName ?? '',
     username: user?.username ?? '',
-    phone: '',
+    phone: registeredPhone ?? '',
     address: '',
   });
 

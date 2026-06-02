@@ -11,10 +11,10 @@ import { getStatusColor, getStatusLabel } from '../lib/orderStatuses';
 export const Orders = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
-  const telegramUserId = useAppStore((state) => state.telegramUserId);
+  const getUserId = useAppStore((state) => state.getUserId);
 
   const user = getTelegramUser();
-  const userId = user?.id || telegramUserId || 0;
+  const userId = user?.id || getUserId();
 
   const { data: orders = [], isLoading } = useOrders(userId);
 

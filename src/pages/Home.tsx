@@ -7,12 +7,13 @@ import { useCreateReferral, useUserReferrals } from '../lib/supabase/hooks';
 
 export const Home = () => {
   const navigate = useNavigate();
-  const { language, setLanguage, setTelegramUserId } = useAppStore();
+  const { language, setLanguage, setTelegramUserId, isRegistered } = useAppStore();
   const [showReferral, setShowReferral] = useState(false);
 
   const createReferral = useCreateReferral();
   const user = getTelegramUser();
   const { data: userReferrals = [] } = useUserReferrals(user?.id || 0);
+
   useEffect(() => {
     if (user) {
       setTelegramUserId(user.id);
@@ -29,7 +30,13 @@ export const Home = () => {
 
   const handleLanguageSelect = (lang: 'ru' | 'uz') => {
     setLanguage(lang);
-    navigate('/catalog');
+    // If user is from Telegram or already registered, go to catalog
+    if (user?.id || isRegistered()) {
+      navigate('/catalog');
+    } else {
+      // Otherwise require registration
+      navigate('/register');
+    }
   };
 
   return (

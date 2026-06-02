@@ -49,7 +49,7 @@ export const useUserProfile = (telegramId: number) => {
   return useQuery({
     queryKey: ['user_profile', telegramId],
     queryFn: () => userQueries.getByTelegramId(telegramId),
-    enabled: !!telegramId,
+    enabled: telegramId > 0,
   });
 };
 
@@ -89,7 +89,7 @@ export const useOrders = (telegramUserId: number) => {
   return useQuery({
     queryKey: ['orders', telegramUserId],
     queryFn: () => orderQueries.getByTelegramUserId(telegramUserId),
-    enabled: !!telegramUserId,
+    enabled: telegramUserId > 0,
   });
 };
 

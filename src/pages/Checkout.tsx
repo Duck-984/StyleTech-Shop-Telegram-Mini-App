@@ -15,7 +15,7 @@ export const Checkout = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
   const { items, getTotalPrice, clearCart } = useCartStore();
-  const telegramUserId = useAppStore((state) => state.telegramUserId);
+  const getUserId = useAppStore((state) => state.getUserId);
 
   const createOrderMutation = useCreateOrder();
   const createPaymentMutation = useCreatePayment();
@@ -96,7 +96,7 @@ export const Checkout = () => {
 
     try {
       const user = getTelegramUser();
-      const userId = user?.id || telegramUserId || 0;
+      const userId = user?.id || getUserId();
 
       const city = selectedZone
         ? (language === 'uz' ? selectedZone.city_uz : selectedZone.city_ru)
