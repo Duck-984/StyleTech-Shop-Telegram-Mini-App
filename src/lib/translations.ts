@@ -122,6 +122,10 @@ export const translations = {
     low_stock_warning: 'Мало на складе',
     stock_updated: 'Остаток обновлён',
     inventory: 'Склад',
+    no_image: 'Нет фото',
+    confirm_remove_item: 'Удалить товар из корзины?',
+    and_more: 'И ещё',
+    items_count: 'товар(ов)',
   },
   uz: {
     app_name: 'StyleTech Shop',
@@ -246,6 +250,10 @@ export const translations = {
     low_stock_warning: 'Omborda kam',
     stock_updated: 'Qoldiq yangilandi',
     inventory: 'Ombor',
+    no_image: 'Rasm yo\'q',
+    confirm_remove_item: 'Mahsulotni savatdan o\'chirish?',
+    and_more: 'Va yana',
+    items_count: 'mahsulot',
   },
 };
 

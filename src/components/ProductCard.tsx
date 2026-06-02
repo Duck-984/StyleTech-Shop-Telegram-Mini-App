@@ -26,8 +26,8 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
-            No Image
+          <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+            {t('no_image')}
           </div>
         )}
 

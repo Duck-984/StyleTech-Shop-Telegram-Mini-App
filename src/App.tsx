@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Home } from './pages/Home';
 import { Register } from './pages/Register';
 import { Catalog } from './pages/Catalog';
@@ -30,9 +31,10 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Routes>
           {/* Public shop routes */}
           <Route path="/" element={<Home />} />
           <Route path="/register" element={<Register />} />
@@ -117,6 +119,7 @@ function App() {
         <ToastContainer />
       </BrowserRouter>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -1,3 +1,4 @@
+import { compare } from 'bcryptjs';
 import { supabase } from './supabase';
 
 export type AdminRole = 'admin' | 'manager' | 'seller';
@@ -16,32 +17,22 @@ export async function loginAdmin(email: string, password: string): Promise<Admin
 
   const { data, error } = await supabase
     .from('admin_accounts')
-    .select('id, email, first_name, role, is_active')
+    .select('id, email, first_name, role, is_active, password_hash, password_plain')
     .eq('email', emailLower)
-    .eq('password_plain', password)
     .eq('is_active', true)
     .maybeSingle();
 
-  if (error || !data) {
-    const fallbackEmail = import.meta.env.VITE_ADMIN_EMAIL;
-    const fallbackPassword = import.meta.env.VITE_ADMIN_PASSWORD;
-    if (
-      fallbackEmail &&
-      fallbackPassword &&
-      emailLower === fallbackEmail.toLowerCase() &&
-      password === fallbackPassword
-    ) {
-      const user: AdminUser = {
-        id: 'admin-001',
-        first_name: 'Администратор',
-        email: fallbackEmail,
-        role: 'admin',
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-      return user;
-    }
-    return null;
+  if (error || !data) return null;
+
+  let passwordMatch = false;
+
+  if (data.password_hash) {
+    passwordMatch = await compare(password, data.password_hash);
+  } else if (data.password_plain) {
+    passwordMatch = password === data.password_plain;
   }
+
+  if (!passwordMatch) return null;
 
   const user: AdminUser = {
     id: data.id,

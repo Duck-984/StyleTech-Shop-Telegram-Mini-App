@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Trash2, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
@@ -9,6 +10,18 @@ export const Cart = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
   const { items, updateQuantity, removeItem, getTotalPrice } = useCartStore();
+  const [confirmRemove, setConfirmRemove] = useState<{ productId: string; size?: string; colorHex?: string } | null>(null);
+
+  const handleRemove = (productId: string, size?: string, colorHex?: string) => {
+    setConfirmRemove({ productId, size, colorHex });
+  };
+
+  const confirmRemoveItem = () => {
+    if (confirmRemove) {
+      removeItem(confirmRemove.productId, confirmRemove.size, confirmRemove.colorHex);
+      setConfirmRemove(null);
+    }
+  };
 
   if (items.length === 0) {
     return (
@@ -55,7 +68,7 @@ export const Cart = () => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                      No Image
+                      {t('no_image')}
                     </div>
                   )}
                 </div>
@@ -101,7 +114,7 @@ export const Cart = () => {
                         <Plus className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => removeItem(item.productId, item.size, item.color?.hex)}
+                        onClick={() => handleRemove(item.productId, item.size, item.color?.hex)}
                         className="w-7 h-7 rounded-full flex items-center justify-center ml-1 text-red-400 active:text-red-600 active:scale-90 transition"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -132,6 +145,31 @@ export const Cart = () => {
           {t('checkout')}
         </button>
       </div>
+
+      {/* Remove confirmation modal */}
+      {confirmRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-8">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 w-full max-w-xs shadow-xl">
+            <p className="text-sm font-medium text-gray-900 dark:text-white text-center mb-4">
+              {t('confirm_remove_item')}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmRemove(null)}
+                className="flex-1 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium active:scale-95 transition"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={confirmRemoveItem}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-medium active:scale-95 transition"
+              >
+                {t('delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

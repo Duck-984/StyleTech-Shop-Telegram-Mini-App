@@ -114,7 +114,7 @@ export const Orders = () => {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                            No Image
+                            {t('no_image')}
                           </div>
                         )}
                       </div>
@@ -131,8 +131,8 @@ export const Orders = () => {
                   ))}
                   {(Array.isArray(order.items) ? order.items as any[] : []).length > 2 && (
                     <p className="text-xs text-gray-500 dark:text-gray-500 pl-15">
-                      {language === 'ru' ? 'И еще' : 'Va yana'} {(order.items as any[]).length - 2}{' '}
-                      {language === 'ru' ? 'товар(ов)' : 'mahsulot'}
+                      {t('and_more')} {(order.items as any[]).length - 2}{' '}
+                      {t('items_count')}
                     </p>
                   )}
                 </div>
@@ -140,7 +140,7 @@ export const Orders = () => {
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600 dark:text-gray-400">
-                      {language === 'ru' ? 'Способ оплаты' : 'To\'lov usuli'}:
+                      {t('payment_method')}:
                     </span>
                     <span className="font-medium text-gray-900 dark:text-white">
                       {getPaymentMethodLabel(order.payment_method)}
@@ -149,7 +149,7 @@ export const Orders = () => {
 
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600 dark:text-gray-400">
-                      {language === 'ru' ? 'Доставка' : 'Yetkazib berish'}:
+                      {t('delivery')}:
                     </span>
                     <span className="font-medium text-gray-900 dark:text-white">
                       {order.delivery_type === 'express'
