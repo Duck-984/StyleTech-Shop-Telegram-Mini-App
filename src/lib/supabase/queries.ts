@@ -93,7 +93,7 @@ export const productQueries = {
       .from('products')
       .select('views')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (product) {
       await supabase
@@ -106,7 +106,7 @@ export const productQueries = {
   uploadImages: async (files: File[]) => {
     const uploadPromises = files.map(async (file) => {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -143,8 +143,9 @@ export const inventoryQueries = {
       .from('products')
       .select('stock')
       .eq('id', productId)
-      .single();
+      .maybeSingle();
     if (fetchErr) throw fetchErr;
+    if (!current) throw new Error(`Product ${productId} not found`);
     const newStock = Math.max(0, (current?.stock ?? 0) + delta);
     const { data, error } = await supabase
       .from('products')
@@ -379,7 +380,7 @@ export const promotionQueries = {
       .from('promotions')
       .select('product_ids')
       .eq('id', promotionId)
-      .single();
+      .maybeSingle();
 
     if (!promotion || !promotion.product_ids?.length) return [];
 

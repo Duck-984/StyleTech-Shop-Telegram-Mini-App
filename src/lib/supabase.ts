@@ -74,7 +74,11 @@ export type Database = {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['orders']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Insert: Omit<Database['public']['Tables']['orders']['Row'], 'id' | 'created_at' | 'updated_at' | 'transaction_id' | 'paid_at' | 'status_history'> & {
+          transaction_id?: string | null;
+          paid_at?: string | null;
+          status_history?: StatusHistoryEntry[];
+        };
         Update: Partial<Database['public']['Tables']['orders']['Insert']>;
       };
       reviews: {

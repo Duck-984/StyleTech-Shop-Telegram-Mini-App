@@ -98,6 +98,12 @@ export const Checkout = () => {
       const user = getTelegramUser();
       const userId = user?.id || getUserId();
 
+      if (!userId) {
+        toast.error(language === 'ru' ? 'Ошибка идентификации пользователя' : 'Foydalanuvchini aniqlashda xatolik');
+        setLoading(false);
+        return;
+      }
+
       const city = selectedZone
         ? (language === 'uz' ? selectedZone.city_uz : selectedZone.city_ru)
         : '';

@@ -103,7 +103,7 @@ export const Orders = () => {
                 </div>
 
                 <div className="space-y-2 mb-3">
-                  {(order.items as any[]).slice(0, 2).map((item: any, index: number) => (
+                  {(Array.isArray(order.items) ? order.items as any[] : []).slice(0, 2).map((item: any, index: number) => (
                     <div key={index} className="flex items-center space-x-3">
                       <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded overflow-hidden flex-shrink-0">
                         {item.image ? (
@@ -129,7 +129,7 @@ export const Orders = () => {
                       </div>
                     </div>
                   ))}
-                  {(order.items as any[]).length > 2 && (
+                  {(Array.isArray(order.items) ? order.items as any[] : []).length > 2 && (
                     <p className="text-xs text-gray-500 dark:text-gray-500 pl-15">
                       {language === 'ru' ? 'И еще' : 'Va yana'} {(order.items as any[]).length - 2}{' '}
                       {language === 'ru' ? 'товар(ов)' : 'mahsulot'}

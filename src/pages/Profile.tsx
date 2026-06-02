@@ -21,7 +21,7 @@ const formatDate = (iso: string) =>
 export const Profile = () => {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
-  const { telegramUserId, getUserId, registeredName, registeredPhone } = useAppStore();
+  const { getUserId, registeredName, registeredPhone } = useAppStore();
   const user = getTelegramUser();
   const userId = user?.id || getUserId();
 

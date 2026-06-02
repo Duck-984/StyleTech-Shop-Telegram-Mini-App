@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Minus, Plus, ShoppingCart, Share2, Star, ChevronLeft, ChevronRight, Heart } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, Share2, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { useTranslation } from '../hooks/useTranslation';
 import { useCartStore } from '../store/useCartStore';
@@ -46,7 +46,7 @@ export const ProductDetail = () => {
     const shareText = `${getLocalizedValue(product.name, language)} - ${formatPrice(product.price as number)}`;
 
     if (tg) {
-      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`);
+      (tg as any).openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`);
     } else if (navigator.share) {
       try {
         await navigator.share({
@@ -184,7 +184,7 @@ export const ProductDetail = () => {
                     </button>
 
                     <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2">
-                      {product.images.map((_, index) => (
+                      {product.images.map((_: string, index: number) => (
                         <button
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
@@ -202,7 +202,7 @@ export const ProductDetail = () => {
 
               {product.images.length > 1 && (
                 <div className="overflow-x-auto px-4 py-2 flex space-x-2">
-                  {product.images.map((img, index) => (
+                  {product.images.map((img: string, index: number) => (
                     <button
                       key={index}
                       onClick={() => setCurrentImageIndex(index)}
@@ -283,7 +283,7 @@ export const ProductDetail = () => {
                 {t('select_size')}
               </p>
               <div className="flex flex-wrap gap-2">
-                {product.sizes.map((size) => (
+                {product.sizes.map((size: string) => (
                   <button
                     key={size}
                     onClick={() => setSelectedSize(size)}
@@ -306,8 +306,8 @@ export const ProductDetail = () => {
                 {t('select_color')}
               </p>
               <div className="flex flex-wrap gap-2">
-                {product.colors.map((color) => {
-                  const col = color as { name: string; hex: string };
+                {product.colors.map((color: { name: string; hex: string }) => {
+                  const col = color;
                   return (
                     <button
                       key={col.hex}

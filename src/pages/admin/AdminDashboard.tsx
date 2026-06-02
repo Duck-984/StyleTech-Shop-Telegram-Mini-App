@@ -169,7 +169,6 @@ export const AdminDashboard = () => {
 
   const maxDayRevenue = Math.max(...stats.salesByDay.map(d => d.revenue), 1);
 
-  const periodDays = period === '7d' ? 7 : period === '30d' ? 30 : null;
   const dateFormat = period === '30d'
     ? { day: 'numeric' as const, month: 'short' as const }
     : { day: 'numeric' as const, month: 'short' as const };

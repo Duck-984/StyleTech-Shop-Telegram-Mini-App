@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { ProductCard } from '../components/ProductCard';
 import { BannerSlider } from '../components/BannerSlider';
