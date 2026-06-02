@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { getTelegramUser } from '../lib/telegram';
 import { ShoppingBag, Gift, Star, ChevronRight } from 'lucide-react';
-import { useCreateReferral, useUserReferrals, useBanners } from '../lib/supabase/hooks';
-import { HomeBannerSlider } from '../components/HomeBannerSlider';
+import { useCreateReferral, useUserReferrals } from '../lib/supabase/hooks';
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -14,8 +13,6 @@ export const Home = () => {
   const createReferral = useCreateReferral();
   const user = getTelegramUser();
   const { data: userReferrals = [] } = useUserReferrals(user?.id || 0);
-  const { data: banners = [] } = useBanners(true);
-
   useEffect(() => {
     if (user) {
       setTelegramUserId(user.id);
@@ -37,16 +34,6 @@ export const Home = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
-      {banners.length > 0 && (
-        <div className="flex-shrink-0">
-          <HomeBannerSlider
-            banners={banners}
-            language={language}
-            onNavigate={(url) => navigate(url && url.startsWith('/') ? url : '/catalog')}
-          />
-        </div>
-      )}
-
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-sm">
           <div className="text-center mb-10">
