@@ -14,6 +14,7 @@ import { AdminOrders } from './pages/admin/AdminOrders';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminBanners } from './pages/admin/AdminBanners';
 import { AdminDelivery } from './pages/admin/AdminDelivery';
+import { AdminProductForm } from './pages/admin/AdminProductForm';
 import { AdminRoute } from './components/AdminRoute';
 import { ToastContainer } from './components/Toast';
 
@@ -57,6 +58,22 @@ function App() {
             element={
               <AdminRoute requiredRole="seller">
                 <AdminProducts />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/products/new"
+            element={
+              <AdminRoute requiredRole="seller">
+                <AdminProductForm />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/products/:id/edit"
+            element={
+              <AdminRoute requiredRole="seller">
+                <AdminProductForm />
               </AdminRoute>
             }
           />

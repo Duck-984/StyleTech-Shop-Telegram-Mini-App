@@ -5,7 +5,7 @@ import { Layout } from '../components/Layout';
 import { useTranslation } from '../hooks/useTranslation';
 import { useCartStore } from '../store/useCartStore';
 import { useAppStore } from '../store/useAppStore';
-import { useCreateOrder, useCreatePayment, useDeliveryZones } from '../lib/supabase/hooks';
+import { useCreateOrder, useCreatePayment, useDeliveryZones, useAdjustStock } from '../lib/supabase/hooks';
 import { formatPrice } from '../lib/utils';
 import { hapticNotification, getTelegramUser } from '../lib/telegram';
 import { toast } from '../components/Toast';
@@ -19,6 +19,7 @@ export const Checkout = () => {
 
   const createOrderMutation = useCreateOrder();
   const createPaymentMutation = useCreatePayment();
+  const adjustStockMutation = useAdjustStock();
   const { data: deliveryZones = [], isLoading: zonesLoading } = useDeliveryZones(true);
 
   const [formData, setFormData] = useState({
@@ -109,7 +110,7 @@ export const Checkout = () => {
           price: item.price,
           quantity: item.quantity,
           size: item.size,
-          color: item.color,
+          color: item.color?.name,
           image: item.image,
         })),
         total_amount: totalAmount,
@@ -131,6 +132,15 @@ export const Checkout = () => {
       });
 
       setOrderId(order.id);
+
+      // Decrement stock for each item in the order
+      for (const item of items) {
+        try {
+          await adjustStockMutation.mutateAsync({ productId: item.productId, delta: -item.quantity });
+        } catch {
+          // Non-critical: don't block order if stock update fails
+        }
+      }
 
       if (formData.paymentMethod !== 'cash') {
         try {

@@ -177,7 +177,38 @@ export const userQueries = {
     return data;
   },
 
+  upsert: async (telegramId: number, userData: { first_name: string; username?: string | null; language?: string }) => {
+    const { data, error } = await supabase
+      .from('users')
+      .upsert(
+        { telegram_id: telegramId, ...userData, updated_at: new Date().toISOString() },
+        { onConflict: 'telegram_id' }
+      )
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   updateProfile: async (telegramId: number, updates: { phone?: string; address?: string; first_name?: string }) => {
+    // First ensure user exists
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('telegram_id', telegramId)
+      .maybeSingle();
+
+    if (!existing) {
+      // Create the user first
+      const { data, error } = await supabase
+        .from('users')
+        .insert({ telegram_id: telegramId, first_name: updates.first_name || '', ...updates })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    }
+
     const { data, error } = await supabase
       .from('users')
       .update({ ...updates, updated_at: new Date().toISOString() })

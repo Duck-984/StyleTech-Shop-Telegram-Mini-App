@@ -14,6 +14,8 @@ import {
 } from './queries';
 import type { Database } from '../supabase';
 
+export { userQueries } from './queries';
+
 // Products
 export const useProducts = (filters?: any, sort?: any) => {
   return useQuery({
